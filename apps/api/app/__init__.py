@@ -1,0 +1,2 @@
+"""PALS API application package."""
+
