@@ -32,6 +32,15 @@ Repositories do not commit independently. Services coordinate each write in one 
 The ExamTopic same-subject invariant is enforced by its service; database foreign keys and the
 composite primary key provide referential and duplicate protection.
 
+Sprint 2 follows the same layering for Questions, Attempts, and Mastery. `AttemptService` is
+the sole mastery mutation path. It locks the Question, inserts the Topic Mastery row if absent,
+locks Mastery with PostgreSQL `SELECT ... FOR UPDATE`, stages the Attempt and score update, and
+commits once. This makes the evidence and projection atomic and prevents concurrent lost updates.
+
+Question mutation and deletion use the same Question-first lock ordering as Attempt creation.
+Once evidence exists, both operations return a conflict. Mastery reads before the first Attempt
+return a virtual zero without inserting database state.
+
 ## AI dependency rule
 Business modules must not import vendor SDKs directly.
 

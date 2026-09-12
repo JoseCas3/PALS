@@ -3,7 +3,10 @@ import uuid
 from sqlalchemy import exists, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.attempt import Attempt
 from app.models.exam_topic import ExamTopic
+from app.models.mastery import Mastery
+from app.models.question import Question
 from app.models.topic import Topic
 
 
@@ -34,6 +37,28 @@ class TopicRepository:
     async def is_attached_to_exam(self, topic_id: uuid.UUID) -> bool:
         return bool(
             await self.session.scalar(select(exists().where(ExamTopic.topic_id == topic_id)))
+        )
+
+    async def has_questions(self, topic_id: uuid.UUID) -> bool:
+        return bool(
+            await self.session.scalar(select(exists().where(Question.topic_id == topic_id)))
+        )
+
+    async def has_learning_evidence(self, topic_id: uuid.UUID) -> bool:
+        has_mastery = await self.session.scalar(
+            select(exists().where(Mastery.topic_id == topic_id))
+        )
+        if has_mastery:
+            return True
+        return bool(
+            await self.session.scalar(
+                select(
+                    exists().where(
+                        Attempt.question_id == Question.id,
+                        Question.topic_id == topic_id,
+                    )
+                )
+            )
         )
 
     async def delete(self, topic: Topic) -> None:

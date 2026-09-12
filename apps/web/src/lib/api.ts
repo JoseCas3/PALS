@@ -1,4 +1,14 @@
-import type { Exam, ExamTopic, Subject, Topic } from "./types";
+import type {
+  Attempt,
+  AttemptResult,
+  Exam,
+  ExamTopic,
+  Mastery,
+  Question,
+  QuestionDifficulty,
+  Subject,
+  Topic,
+} from "./types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -67,4 +77,37 @@ export const api = {
     }),
   deleteExamTopic: (examId: string, topicId: string) =>
     request<void>(`/exams/${examId}/topics/${topicId}`, { method: "DELETE" }),
+
+  listQuestions: (topicId: string) => request<Question[]>(`/topics/${topicId}/questions`),
+  createQuestion: (
+    topicId: string,
+    value: { prompt: string; answer_reference: string; difficulty: QuestionDifficulty },
+  ) =>
+    request<Question>(`/topics/${topicId}/questions`, { method: "POST", ...body(value) }),
+  updateQuestion: (
+    id: string,
+    value: Partial<{
+      prompt: string;
+      answer_reference: string;
+      difficulty: QuestionDifficulty;
+    }>,
+  ) => request<Question>(`/questions/${id}`, { method: "PATCH", ...body(value) }),
+  deleteQuestion: (id: string) =>
+    request<void>(`/questions/${id}`, { method: "DELETE" }),
+  listAttempts: (questionId: string) =>
+    request<Attempt[]>(`/questions/${questionId}/attempts`),
+  recordAttempt: (
+    questionId: string,
+    value: {
+      correct: boolean;
+      hints_used: number;
+      solution_seen: boolean;
+      time_spent_seconds: number;
+    },
+  ) =>
+    request<AttemptResult>(`/questions/${questionId}/attempts`, {
+      method: "POST",
+      ...body(value),
+    }),
+  getMastery: (topicId: string) => request<Mastery>(`/topics/${topicId}/mastery`),
 };

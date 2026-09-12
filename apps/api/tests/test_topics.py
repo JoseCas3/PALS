@@ -48,3 +48,44 @@ async def test_topic_parent_and_resource_errors(async_client: AsyncClient) -> No
         f"/api/v1/subjects/{uuid.uuid4()}/topics", json={"name": " "}
     )
     assert blank.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_topic_delete_is_restricted_by_questions_and_learning_evidence(
+    async_client: AsyncClient,
+) -> None:
+    subject = await create_subject(async_client)
+    with_question = await async_client.post(
+        f"/api/v1/subjects/{subject['id']}/topics", json={"name": "Unattempted"}
+    )
+    question = await async_client.post(
+        f"/api/v1/topics/{with_question.json()['id']}/questions",
+        json={"prompt": "Prompt", "answer_reference": "Answer"},
+    )
+    blocked = await async_client.delete(
+        f"/api/v1/topics/{with_question.json()['id']}"
+    )
+    assert blocked.status_code == 409
+    assert blocked.json()["error"]["code"] == "TOPIC_HAS_QUESTIONS"
+
+    with_evidence = await async_client.post(
+        f"/api/v1/subjects/{subject['id']}/topics", json={"name": "Attempted"}
+    )
+    attempted_question = await async_client.post(
+        f"/api/v1/topics/{with_evidence.json()['id']}/questions",
+        json={"prompt": "Prompt", "answer_reference": "Answer"},
+    )
+    await async_client.post(
+        f"/api/v1/questions/{attempted_question.json()['id']}/attempts",
+        json={
+            "correct": True,
+            "hints_used": 0,
+            "solution_seen": False,
+            "time_spent_seconds": 1,
+        },
+    )
+    blocked = await async_client.delete(f"/api/v1/topics/{with_evidence.json()['id']}")
+    assert blocked.status_code == 409
+    assert blocked.json()["error"]["code"] == "TOPIC_HAS_LEARNING_EVIDENCE"
+
+    assert question.status_code == 201

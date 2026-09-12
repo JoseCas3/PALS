@@ -46,9 +46,37 @@ PUT body:
 Weight must satisfy `0 < weight <= 1`. Duplicate pairs are prevented, and Exam and Topic must
 belong to the same Subject. No total-weight constraint is imposed in Sprint 1.
 
+## Questions
+
+- `GET /topics/{topic_id}/questions` → 200, deterministic oldest-first list
+- `POST /topics/{topic_id}/questions` → 201
+- `GET /questions/{question_id}` → 200
+- `PATCH /questions/{question_id}` → 200, or 409 after an Attempt exists
+- `DELETE /questions/{question_id}` → 204, or 409 `QUESTION_HAS_ATTEMPTS`
+
+Question create fields are `prompt`, `answer_reference`, and optional `difficulty` (`easy`,
+`medium`, or `hard`, default `medium`). Topic ownership cannot be changed.
+
+## Attempts
+
+- `POST /questions/{question_id}/attempts` → 201
+- `GET /questions/{question_id}/attempts` → 200, deterministic newest-first list
+
+Attempt creation requires `correct`, `hints_used`, `solution_seen`, and `time_spent_seconds`.
+Correctness is trusted self-reported Alpha evidence. Attempts cannot be updated or deleted.
+Creation returns both the committed Attempt and resulting Mastery.
+
+## Mastery
+
+- `GET /topics/{topic_id}/mastery` → 200
+
+Scores are fixed two-place decimal strings. Before the first Attempt the endpoint returns
+`{"topic_id":"...","score":"0.00","updated_at":null}` without creating a database row.
+There is no mastery mutation endpoint.
+
 ## Deferred Alpha 0.1 endpoints
 
-Questions, Attempts, Mastery, and Tutor endpoints are deferred beyond Sprint 1.
+Tutor endpoints are deferred beyond Sprint 2.
 
 ## Health
 
@@ -73,4 +101,5 @@ All Sprint 1 errors, including request validation errors, use:
 
 - 422: malformed IDs/dates, blank names, invalid weights, or invalid request bodies
 - 404: missing requested or referenced resources
-- 409: current-state conflicts such as protected deletion or cross-subject assignment
+- 409: current-state conflicts such as protected deletion, attempted-Question mutation, or
+  cross-subject assignment

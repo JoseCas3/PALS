@@ -32,3 +32,6 @@ Use one provider in Alpha 0.1, but preserve a clean provider boundary.
 
 ## Mastery rule
 AI explanations never increase mastery. Demonstrated performance does.
+
+Sprint 2 introduces no AI provider, generation, or grading. Attempt correctness is explicitly
+self-reported by the Alpha user. Only a successfully committed Attempt changes mastery.

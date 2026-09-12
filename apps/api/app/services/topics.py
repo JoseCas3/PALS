@@ -53,6 +53,18 @@ class TopicService:
                 "TOPIC_HAS_EXAMS",
                 "Topic cannot be deleted while it is assigned to an exam",
             )
+        if await self.topics.has_learning_evidence(topic_id):
+            raise ApplicationError(
+                409,
+                "TOPIC_HAS_LEARNING_EVIDENCE",
+                "Topic cannot be deleted while it has learning evidence",
+            )
+        if await self.topics.has_questions(topic_id):
+            raise ApplicationError(
+                409,
+                "TOPIC_HAS_QUESTIONS",
+                "Topic cannot be deleted while it has questions",
+            )
         try:
             await self.topics.delete(topic)
             await self.session.commit()

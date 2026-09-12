@@ -124,3 +124,14 @@ docker compose up -d postgres
 cd apps/api
 python -m pytest
 ```
+
+## Sprint 2 practice evidence and mastery
+
+Sprint 2 adds manually authored Questions, immutable self-reported Attempts, and exact
+Topic Mastery scores. Mastery changes only when an Attempt and its corresponding Mastery
+update commit together. The home page includes a minimal practice panel for selecting a
+Topic, managing unattempted Questions, recording evidence, and reviewing recent Attempts.
+
+Alpha correctness is self-reported. PALS does not automatically grade answers or use an AI
+provider in Sprint 2. Mastery scores are stored as PostgreSQL `NUMERIC(5,2)` and returned as
+fixed two-place strings.

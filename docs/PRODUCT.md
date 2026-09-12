@@ -27,3 +27,12 @@ Authentication, billing, mobile apps, OCR, PDF/RAG, flashcards, spaced repetitio
 
 ## Success criteria
 Use PALS for one real subject and obtain a useful mastery profile from real practice attempts.
+
+## Sprint 2 evidence rules
+
+- Questions are manually authored and use a prompt plus answer reference.
+- Attempt correctness is trusted, self-reported evidence in the single-user Alpha.
+- There is no AI or automatic answer grading in Sprint 2.
+- Reading or editing academic content never changes mastery.
+- Help scales evidence strength for both correct and incorrect Attempts; it is not a punishment.
+- Attempt evidence is immutable, and a Question becomes immutable after its first Attempt.
