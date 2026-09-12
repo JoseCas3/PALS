@@ -1,6 +1,7 @@
 import { ApiHealthStatus } from "@/components/api-health-status";
 import { DomainManager } from "@/components/domain-manager";
 import { PracticeManager } from "@/components/practice-manager";
+import { StudyPlanner } from "@/components/study-planner";
 
 export default function Home() {
   return (
@@ -10,12 +11,13 @@ export default function Home() {
           Personal Adaptive Learning System
         </p>
         <div className="flex flex-wrap items-end justify-between gap-6">
-          <div><h1 className="text-5xl font-semibold tracking-[-0.045em] sm:text-6xl">Academic setup and practice</h1><p className="mt-3 text-lg text-[var(--muted)]">Build your curriculum, practice questions, and track evidence-based mastery.</p></div>
+          <div><h1 className="text-5xl font-semibold tracking-[-0.045em] sm:text-6xl">Learn with evidence and direction</h1><p className="mt-3 text-lg text-[var(--muted)]">Build your curriculum, track evidence-based mastery, and see what to study next.</p></div>
           <ApiHealthStatus />
         </div>
       </header>
       <DomainManager />
       <div className="mt-6"><PracticeManager /></div>
+      <div className="mt-6"><StudyPlanner /></div>
     </main>
   );
 }

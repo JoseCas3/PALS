@@ -74,9 +74,29 @@ Scores are fixed two-place decimal strings. Before the first Attempt the endpoin
 `{"topic_id":"...","score":"0.00","updated_at":null}` without creating a database row.
 There is no mastery mutation endpoint.
 
+## Study Plan
+
+- `GET /exams/{exam_id}/study-plan` -> 200
+
+The response contains Exam metadata, the captured UTC `generated_at`, and Topics ordered by
+priority descending, Mastery ascending, ExamTopic weight descending, then Topic UUID ascending.
+Mastery remains a fixed two-place string. Mastery need, urgency, Exam weight, priority, reason
+factor values, and formula weights are fixed four-place strings.
+
+Priority is `0.50 * MasteryNeed + 0.30 * Urgency + 0.20 * ExamWeight`, calculated with Python
+`Decimal` and `ROUND_HALF_UP`. Urgency is linear over 30 elapsed days, from `0.0000` at or beyond
+30 days to `1.0000` at the Exam instant. Every Topic in one Exam shares urgency, so it changes
+absolute scores but not within-Exam order.
+
+The deterministic reason reports the strongest weighted contributor. Equal contributions prefer
+Mastery need, then urgency, then Exam weight. A missing Mastery row is virtual `0.00`; a fully
+mastered Topic remains included. An Exam without Topics returns an empty `items` list. Past Exams
+return 409 `EXAM_ALREADY_PASSED`. Responses include `Cache-Control: no-store`. Planning performs
+no writes and uses no AI.
+
 ## Deferred Alpha 0.1 endpoints
 
-Tutor endpoints are deferred beyond Sprint 2.
+Tutor endpoints are deferred beyond Sprint 3.
 
 ## Health
 
@@ -101,5 +121,5 @@ All Sprint 1 errors, including request validation errors, use:
 
 - 422: malformed IDs/dates, blank names, invalid weights, or invalid request bodies
 - 404: missing requested or referenced resources
-- 409: current-state conflicts such as protected deletion, attempted-Question mutation, or
-  cross-subject assignment
+- 409: current-state conflicts such as protected deletion, attempted-Question mutation,
+  cross-subject assignment, or requesting a Study Plan for a past Exam

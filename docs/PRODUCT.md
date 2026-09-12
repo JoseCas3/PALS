@@ -36,3 +36,15 @@ Use PALS for one real subject and obtain a useful mastery profile from real prac
 - Reading or editing academic content never changes mastery.
 - Help scales evidence strength for both correct and incorrect Attempts; it is not a punishment.
 - Attempt evidence is immutable, and a Question becomes immutable after its first Attempt.
+
+## Sprint 3 planning rules
+
+- A per-Exam Study Plan answers "What should I study for this Exam?"
+- Priority is `0.50 * MasteryNeed + 0.30 * Urgency + 0.20 * ExamWeight`.
+- Urgency increases linearly over the final 30 elapsed days before an Exam.
+- Planning is deterministic, read-only, calculated on demand, and uses no AI.
+- A missing Mastery row is virtual `0.00`; planning never creates it.
+- Fully mastered Topics remain eligible because urgency and Exam weight still contribute.
+- A past Exam remains valid history but returns a conflict when asked for a current plan.
+- Within one Exam, urgency changes absolute scores but not relative Topic order because all its
+  Topics share the same urgency.

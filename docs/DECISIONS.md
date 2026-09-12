@@ -51,3 +51,15 @@ lost concurrent updates.
 Accepted. Attempts are immutable. Questions become immutable after their first Attempt.
 Questions, Attempts, and Mastery use restrictive foreign keys; no practice evidence is deleted
 through a cascade. Topic deletion is blocked by Questions or learning evidence.
+
+## ADR-015 Deterministic on-demand study planning
+
+Accepted. Per-Exam Topic priority uses exact Python `Decimal` values and fixed code constants:
+50% Mastery need, 30% linear urgency over a 30 elapsed-day horizon, and 20% direct ExamTopic
+weight. Components and priority use four places with `ROUND_HALF_UP`. The route captures one
+injectable UTC instant. Plans are read-only projections and are not persisted; missing Mastery is
+virtual zero and fully mastered Topics remain included. Past Exams return
+`EXAM_ALREADY_PASSED`. Reasons deterministically identify the strongest weighted contribution,
+with Mastery need, urgency, then Exam weight as tie precedence. Sorting uses priority descending,
+Mastery ascending, Exam weight descending, and Topic UUID ascending. Because urgency is common
+within an Exam, it affects absolute scores but not within-Exam order. No AI participates.

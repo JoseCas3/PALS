@@ -41,6 +41,17 @@ Question mutation and deletion use the same Question-first lock ordering as Atte
 Once evidence exists, both operations return a conflict. Mastery reads before the first Attempt
 return a virtual zero without inserting database state.
 
+Sprint 3 implements the planner through a dedicated route, service, and repository. The service
+loads the Exam, rejects historical planning, calculates urgency once, and obtains all Topic,
+ExamTopic, and optional Mastery inputs with one joined query. Pure functions perform exact
+Decimal calculations and deterministic sorting. The route captures one UTC instant through a
+minimal injectable `utc_now` dependency and passes it explicitly to the service.
+
+Study planning is a read-only projection: its path contains no add, flush, commit, delete,
+`FOR UPDATE`, or Mastery lazy-insert operation. It does not persist plans or priorities. Within a
+single Exam every Topic has the same urgency, so urgency changes absolute priority but cannot
+change relative ordering; cross-Exam planning remains deferred.
+
 ## AI dependency rule
 Business modules must not import vendor SDKs directly.
 

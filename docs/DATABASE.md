@@ -91,9 +91,16 @@ Attempt creation and Mastery mutation share one service-owned transaction. Postg
 serialize Mastery updates for a Topic; `INSERT ... ON CONFLICT DO NOTHING` safely handles two
 simultaneous first Attempts.
 
+## Sprint 3 planner projection
+
+Sprint 3 adds no table, column, index, or migration. A Study Plan is calculated on demand from
+`exams`, `exam_topics`, `topics`, optional `mastery`, and a captured UTC instant. Missing Mastery
+is represented as `Decimal("0.00")` in memory and is not inserted. No priority or plan history is
+stored.
+
 ## Deferred Alpha 0.1 schema
 
-The following remain planned but are not part of Sprint 1:
+The following remain planned but are not part of Sprint 3:
 
 - Topic hierarchy (`parent_topic_id`) and importance
 - Exam target and maximum scores

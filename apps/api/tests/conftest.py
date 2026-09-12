@@ -24,22 +24,27 @@ async def ensure_database_schema() -> AsyncIterator[None]:
 
 
 @pytest.fixture
-async def async_client() -> AsyncIterator[AsyncClient]:
+async def db_session() -> AsyncIterator[AsyncSession]:
     async with test_engine.connect() as connection:
         transaction = await connection.begin()
         session = AsyncSession(
             bind=connection, expire_on_commit=False, join_transaction_mode="create_savepoint"
         )
-
-        async def override_session() -> AsyncIterator[AsyncSession]:
-            yield session
-
-        fastapi_app.dependency_overrides[get_session] = override_session
-        async with AsyncClient(
-            transport=ASGITransport(app=fastapi_app), base_url="http://test"
-        ) as client:
-            yield client
-        fastapi_app.dependency_overrides.clear()
+        yield session
         await session.close()
         if transaction.is_active:
             await transaction.rollback()
+
+
+@pytest.fixture
+async def async_client(db_session: AsyncSession) -> AsyncIterator[AsyncClient]:
+
+    async def override_session() -> AsyncIterator[AsyncSession]:
+        yield db_session
+
+    fastapi_app.dependency_overrides[get_session] = override_session
+    async with AsyncClient(
+        transport=ASGITransport(app=fastapi_app), base_url="http://test"
+    ) as client:
+        yield client
+    fastapi_app.dependency_overrides.clear()

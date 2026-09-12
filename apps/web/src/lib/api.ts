@@ -6,6 +6,7 @@ import type {
   Mastery,
   Question,
   QuestionDifficulty,
+  StudyPlan,
   Subject,
   Topic,
 } from "./types";
@@ -110,4 +111,5 @@ export const api = {
       ...body(value),
     }),
   getMastery: (topicId: string) => request<Mastery>(`/topics/${topicId}/mastery`),
+  getStudyPlan: (examId: string) => request<StudyPlan>(`/exams/${examId}/study-plan`),
 };

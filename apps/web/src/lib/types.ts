@@ -63,3 +63,35 @@ export type AttemptResult = {
   attempt: Attempt;
   mastery: Mastery;
 };
+
+export type PlannerFactorCode = "mastery_need" | "urgency" | "exam_weight";
+
+export type PlannerReasonFactor = {
+  code: PlannerFactorCode;
+  value: string;
+  formula_weight: string;
+};
+
+export type PlannerReason = {
+  summary: string;
+  factors: PlannerReasonFactor[];
+};
+
+export type StudyPlanItem = {
+  topic_id: string;
+  topic_name: string;
+  mastery_score: string;
+  mastery_need: string;
+  urgency: string;
+  exam_weight: string;
+  priority: string;
+  reason: PlannerReason;
+};
+
+export type StudyPlan = {
+  exam_id: string;
+  exam_name: string;
+  exam_date: string;
+  generated_at: string;
+  items: StudyPlanItem[];
+};

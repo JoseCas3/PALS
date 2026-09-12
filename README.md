@@ -135,3 +135,11 @@ Topic, managing unattempted Questions, recording evidence, and reviewing recent 
 Alpha correctness is self-reported. PALS does not automatically grade answers or use an AI
 provider in Sprint 2. Mastery scores are stored as PostgreSQL `NUMERIC(5,2)` and returned as
 fixed two-place strings.
+
+## Sprint 3 adaptive study planner
+
+Sprint 3 adds a deterministic, read-only Study Plan for an Exam at
+`GET /api/v1/exams/{exam_id}/study-plan`. It ranks assigned Topics from exact Decimal
+Mastery need, a linear 30-day Exam urgency, and ExamTopic weight, then explains which weighted
+factor contributes most. Plans are calculated on demand and are never persisted. The home page
+provides a minimal Subject-to-Exam planner that preserves the server ranking.

@@ -35,3 +35,8 @@ AI explanations never increase mastery. Demonstrated performance does.
 
 Sprint 2 introduces no AI provider, generation, or grading. Attempt correctness is explicitly
 self-reported by the Alpha user. Only a successfully committed Attempt changes mastery.
+
+Sprint 3 Study Plan ranking and explanations are also non-AI capabilities. Exact code constants,
+current Mastery, Exam urgency, and ExamTopic weight determine priority. The deterministic reason
+identifies the strongest weighted contributor. A future AI Tutor may present this structured
+reason but must not replace or alter the authoritative calculation.
