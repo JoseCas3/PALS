@@ -98,3 +98,29 @@ npm run build
 
 The browser reads `NEXT_PUBLIC_API_URL` directly. `CORS_ORIGINS` is a comma-separated list of
 the web origins allowed to make local API requests.
+
+## Sprint 1 domain core
+
+Sprint 1 adds Subjects, Topics, Exams, and weighted ExamTopic associations under
+`/api/v1`. The home page provides a minimal interface for managing these records.
+
+The Docker Compose API command runs `alembic upgrade head` before Uvicorn as a local
+development convenience. This is not the production migration strategy; production
+migration orchestration remains a deployment concern for a later sprint.
+
+To run migrations manually from `apps/api`:
+
+```bash
+alembic upgrade head
+alembic downgrade base
+alembic upgrade head
+```
+
+Domain integration tests require PostgreSQL and use `DATABASE_URL`. With the Compose
+database running, the default host URL works:
+
+```bash
+docker compose up -d postgres
+cd apps/api
+python -m pytest
+```
