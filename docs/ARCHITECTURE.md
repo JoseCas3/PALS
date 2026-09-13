@@ -74,3 +74,15 @@ TutorService reads Question/Topic/Subject context, commits a pending metadata-on
 then calls the provider with no database transaction open. A short second transaction finalizes
 success or failure. TutorService has no dependency on Attempt, Mastery, ExamTopic, or planner
 mutation paths.
+
+## Sprint 5 Question generation flow
+
+Sprint 5 adds `QuestionGenerationService -> AIGateway -> AIProvider -> OpenAIProvider` alongside
+Tutor. A dedicated read repository loads Subject/Topic metadata and existing Question prompts. Only
+the metadata is sent to the provider; existing prompts remain local for textual duplicate checks.
+
+`AIRequest` optionally carries a provider-neutral JSON Schema description and an operation-specific
+output-character limit. The OpenAI adapter maps that description to strict Responses API structured
+output, while the service parses the returned JSON and applies authoritative Pydantic and domain
+validation. Candidates are returned to the browser and are not persisted. Approval continues through
+`QuestionService`; generation has no dependency on evidence or planner mutation paths.

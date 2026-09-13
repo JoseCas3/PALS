@@ -155,3 +155,16 @@ Tutor calls store metadata-only `AIInteraction` rows for operational observabili
 answer references, generated content, secrets, and provider payloads are not persisted. The API
 still boots and all non-AI features work without `AI_API_KEY`; Tutor requests then return a safe
 503 response.
+
+## Sprint 5 AI-assisted practice generation
+
+Sprint 5 adds Topic-scoped Question candidate generation at
+`POST /api/v1/topics/{topic_id}/question-generation`. The AI Gateway requests a strict structured
+result, PALS validates the complete result, and the frontend shows an unpersisted preview. A user
+must copy one candidate into the ordinary editable Question form and submit the existing Question
+endpoint before a Question is created.
+
+Generation uses Subject and Topic metadata plus model knowledge; it is not grounded in uploaded
+course material. Candidate prompts and answers are not retained by PALS. Generation never creates
+Attempts or changes Mastery, ExamTopic data, or Study Plans. Without `AI_API_KEY`, both Tutor and
+Question Generation return a safe 503 while non-AI features continue working.

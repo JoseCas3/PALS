@@ -12,9 +12,21 @@ from app.ai.contracts import (
     AIProviderTimeout,
     AIProviderUnavailable,
     AIRequest,
+    AIStructuredResponse,
 )
 
 REQUEST = AIRequest("question_tutor", "system", "user", 800)
+STRUCTURED_REQUEST = AIRequest(
+    "question_generation",
+    "system",
+    "user",
+    4_000,
+    structured_response=AIStructuredResponse(
+        "question_generation",
+        {"type": "object", "properties": {}, "additionalProperties": False},
+    ),
+    max_output_chars=32_000,
+)
 
 
 @pytest.mark.asyncio
@@ -45,6 +57,61 @@ async def test_openai_adapter_maps_responses_request_and_result() -> None:
     assert result.input_tokens == 10
     assert result.output_tokens == 5
     assert result.provider_request_id == "openai-request"
+
+
+@pytest.mark.asyncio
+async def test_openai_adapter_maps_structured_response_request() -> None:
+    client = SimpleNamespace(
+        responses=SimpleNamespace(
+            create=AsyncMock(
+                return_value=SimpleNamespace(
+                    status="completed",
+                    output_text='{"candidates": []}',
+                    model="configured-model",
+                    usage=SimpleNamespace(input_tokens=10, output_tokens=5),
+                    _request_id="structured-request",
+                )
+            )
+        )
+    )
+    result = await OpenAIProvider(client, "configured-model", 20).generate(
+        STRUCTURED_REQUEST
+    )
+    client.responses.create.assert_awaited_once_with(
+        model="configured-model",
+        instructions="system",
+        input="user",
+        max_output_tokens=4_000,
+        store=False,
+        timeout=20,
+        text={
+            "format": {
+                "type": "json_schema",
+                "name": "question_generation",
+                "schema": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": False,
+                },
+                "strict": True,
+            }
+        },
+    )
+    assert result.content == '{"candidates": []}'
+    assert result.provider_request_id == "structured-request"
+
+
+@pytest.mark.asyncio
+async def test_openai_adapter_rejects_incomplete_structured_response() -> None:
+    client = SimpleNamespace(
+        responses=SimpleNamespace(
+            create=AsyncMock(
+                return_value=SimpleNamespace(status="incomplete", output_text="partial")
+            )
+        )
+    )
+    with pytest.raises(AIProviderInvalidResponse):
+        await OpenAIProvider(client, "model", 20).generate(STRUCTURED_REQUEST)
 
 
 def test_openai_adapter_disables_sdk_retries() -> None:

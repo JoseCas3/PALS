@@ -6,6 +6,8 @@ import type {
   Mastery,
   Question,
   QuestionDifficulty,
+  QuestionGenerationResponse,
+  GenerationDifficulty,
   StudyPlan,
   Subject,
   Topic,
@@ -86,6 +88,14 @@ export const api = {
     value: { prompt: string; answer_reference: string; difficulty: QuestionDifficulty },
   ) =>
     request<Question>(`/topics/${topicId}/questions`, { method: "POST", ...body(value) }),
+  generateQuestions: (
+    topicId: string,
+    value: { count: number; difficulty: GenerationDifficulty },
+  ) =>
+    request<QuestionGenerationResponse>(`/topics/${topicId}/question-generation`, {
+      method: "POST",
+      ...body(value),
+    }),
   updateQuestion: (
     id: string,
     value: Partial<{

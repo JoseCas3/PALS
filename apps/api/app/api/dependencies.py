@@ -29,7 +29,7 @@ async def get_ai_gateway() -> AsyncIterator[AIGateway]:
         raise ApplicationError(
             503,
             "AI_PROVIDER_UNAVAILABLE",
-            "Tutor service is temporarily unavailable",
+            "AI service is temporarily unavailable",
         )
     provider = OpenAIProvider.create(
         api_key=api_key,

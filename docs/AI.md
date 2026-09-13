@@ -60,3 +60,22 @@ respective final-answer rules.
 Provider output is untrusted. Empty, whitespace-only, or greater-than-12,000-character responses
 are rejected. The frontend renders text without HTML or a Markdown renderer. One request makes
 one provider attempt; there are no retries or conversations.
+
+## Sprint 5 structured Question generation
+
+Question generation uses neutral prompt version `question_generation.v1`, a fixed 4,000 output-token
+budget, and a 32,000-character result limit. `AIRequest` may carry a neutral strict JSON Schema;
+the OpenAI adapter maps it to Responses API structured output without exposing SDK types. PALS then
+parses the JSON and validates the complete result with Pydantic. One invalid candidate, count
+mismatch, requested-difficulty mismatch, or normalized within-response duplicate rejects the whole
+result without retry.
+
+The provider receives only Subject name, Topic name, optional Topic description (maximum 4,000
+characters), count, and difficulty. Existing Questions stay local. Duplicate comparison uses NFKC,
+trimming, collapsed whitespace, and Unicode casefold while keeping punctuation significant.
+Semantic duplication is not detected.
+
+Candidates are transient and require human review through the existing Question form. PALS stores
+only AIInteraction metadata with operation `question_generation`; it stores no prompts, candidate
+content, response bodies, or generation settings. This feature has no RAG or course-document
+grounding and does not grade answers or mutate learning evidence.

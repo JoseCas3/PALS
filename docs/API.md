@@ -94,9 +94,34 @@ mastered Topic remains included. An Exam without Topics returns an empty `items`
 return 409 `EXAM_ALREADY_PASSED`. Responses include `Cache-Control: no-store`. Planning performs
 no writes and uses no AI.
 
+## Question Generation
+
+- `POST /topics/{topic_id}/question-generation` -> 200
+
+Request fields are strict `count` (default 5, minimum 1, maximum 10) and `difficulty` (default
+`mixed`, or `easy`, `medium`, `hard`). Extra fields are rejected. A specific difficulty requires
+every candidate to match; mixed allows any valid difficulty.
+
+The response contains interaction and Topic IDs, provider/model metadata, prompt version
+`question_generation.v1`, creation time, and exactly the requested number of candidates. Each
+candidate contains trimmed `prompt` (maximum 1,000 characters), required `answer_reference`
+(maximum 2,000), difficulty, and a locally calculated `duplicate_existing` flag. Responses include
+`Cache-Control: no-store`.
+
+Malformed, empty, incomplete, refused, or otherwise unusable provider output returns 502
+`AI_PROVIDER_INVALID_RESPONSE`. Decoded JSON that violates the candidate contract, count,
+difficulty, or within-response uniqueness returns 422 `GENERATED_CANDIDATES_INVALID`. Oversized
+Topic context returns 422 `GENERATION_CONTEXT_TOO_LARGE`; neutral provider errors retain the Tutor
+502/503/504 mappings.
+
+Candidates are previews only. To approve one, the frontend copies it into the existing Question
+form and uses `POST /topics/{topic_id}/questions`. Normalized duplicates against existing Questions
+are advisory and do not block that endpoint.
+
 ## Deferred Alpha 0.1 endpoints
 
-Topic Tutor, conversations, general chat, AI grading, and Question generation remain deferred.
+Topic Tutor, conversations, general chat, AI grading, bulk approval, and generation history remain
+deferred.
 
 ## Question Tutor
 

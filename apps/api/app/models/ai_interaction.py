@@ -23,8 +23,10 @@ class AIInteraction(Base):
     __tablename__ = "ai_interactions"
     __table_args__ = (
         CheckConstraint(
-            "help_level >= 1 AND help_level <= 6",
-            name="ck_ai_interactions_help_level_range",
+            "(operation = 'question_tutor' AND help_level IS NOT NULL "
+            "AND help_level >= 1 AND help_level <= 6) OR "
+            "(operation = 'question_generation' AND help_level IS NULL)",
+            name="ck_ai_interactions_operation_help_consistent",
         ),
         CheckConstraint("input_chars >= 0", name="ck_ai_interactions_input_chars_nonnegative"),
         CheckConstraint(
@@ -42,10 +44,6 @@ class AIInteraction(Base):
         CheckConstraint(
             "latency_ms IS NULL OR latency_ms >= 0",
             name="ck_ai_interactions_latency_ms_nonnegative",
-        ),
-        CheckConstraint(
-            "operation = 'question_tutor'",
-            name="ck_ai_interactions_operation_allowed",
         ),
         CheckConstraint(
             "(success IS NULL AND error_code IS NULL AND latency_ms IS NULL "
@@ -74,7 +72,7 @@ class AIInteraction(Base):
     question_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("questions.id", ondelete="SET NULL"), nullable=True
     )
-    help_level: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    help_level: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
     prompt_version: Mapped[str] = mapped_column(String(50), nullable=False)
     input_chars: Mapped[int] = mapped_column(Integer, nullable=False)
     output_chars: Mapped[int | None] = mapped_column(Integer, nullable=True)

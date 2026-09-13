@@ -83,3 +83,26 @@ or dollar-cost estimate is stored.
 Accepted. Tutor usage and AIInteraction rows cannot create or modify Attempts, Mastery,
 Questions, ExamTopics, or Study Plans. Tutor levels are not mapped to `hints_used` or
 `solution_seen`. Only the existing Attempt path changes Mastery.
+
+## ADR-019 Preview-only AI Question generation
+
+Accepted. Topic-scoped generation returns transient candidates only. Human review is mandatory,
+and generation itself creates no Questions or learning evidence.
+
+## ADR-020 Provider-native structure plus PALS validation
+
+Accepted. A neutral JSON Schema request is mapped inside the OpenAI adapter to strict structured
+output. Returned JSON remains a string across the gateway and is parsed and authoritatively
+validated by PALS. Invalid candidate sets fail atomically with no automatic retry.
+
+## ADR-021 Local textual duplicate detection
+
+Accepted. Existing Question prompts are not sent to the provider. NFKC, trim, whitespace collapse,
+and casefold detect textual matches locally. Duplicates within a generated set invalidate the set;
+matches against existing Questions produce an advisory warning. Semantic detection is deferred.
+
+## ADR-022 Existing Question persistence remains authoritative
+
+Accepted. “Use candidate” copies one proposal into the ordinary editable Question form. The user
+submits the existing one-Question POST, preserving Question validation and transaction semantics.
+There is no bulk approval, candidate persistence, or Question provenance.

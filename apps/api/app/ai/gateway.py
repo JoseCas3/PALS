@@ -48,7 +48,7 @@ class AIGateway:
 
         latency_ms = _elapsed_ms(started_at)
         content = response.content.strip()
-        if not content or len(content) > MAX_AI_OUTPUT_CHARS:
+        if not content or len(content) > request.max_output_chars:
             invalid_error = AIProviderInvalidResponse(response.provider, response.model)
             invalid_error.latency_ms = latency_ms
             raise invalid_error

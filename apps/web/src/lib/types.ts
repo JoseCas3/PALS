@@ -32,6 +32,7 @@ export type ExamTopic = {
 };
 
 export type QuestionDifficulty = "easy" | "medium" | "hard";
+export type GenerationDifficulty = QuestionDifficulty | "mixed";
 
 export type Question = {
   id: string;
@@ -41,6 +42,23 @@ export type Question = {
   difficulty: QuestionDifficulty;
   created_at: string;
   updated_at: string;
+};
+
+export type QuestionGenerationCandidate = {
+  prompt: string;
+  answer_reference: string;
+  difficulty: QuestionDifficulty;
+  duplicate_existing: boolean;
+};
+
+export type QuestionGenerationResponse = {
+  interaction_id: string;
+  topic_id: string;
+  candidates: QuestionGenerationCandidate[];
+  provider: string;
+  model: string;
+  prompt_version: string;
+  created_at: string;
 };
 
 export type Attempt = {

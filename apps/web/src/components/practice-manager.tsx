@@ -1,13 +1,15 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 
 import { api } from "../lib/api";
 import type {
   Attempt,
+  GenerationDifficulty,
   Mastery,
   Question,
   QuestionDifficulty,
+  QuestionGenerationCandidate,
   Subject,
   Topic,
 } from "../lib/types";
@@ -37,6 +39,15 @@ export function PracticeManager() {
   const [questionForm, setQuestionForm] = useState(emptyQuestion);
   const [attemptForm, setAttemptForm] = useState(emptyAttempt);
   const [submittingAttempt, setSubmittingAttempt] = useState(false);
+  const [generationCount, setGenerationCount] = useState("5");
+  const [generationDifficulty, setGenerationDifficulty] =
+    useState<GenerationDifficulty>("mixed");
+  const [generatedCandidates, setGeneratedCandidates] = useState<
+    QuestionGenerationCandidate[]
+  >([]);
+  const [generating, setGenerating] = useState(false);
+  const [generationError, setGenerationError] = useState("");
+  const generationRequest = useRef(0);
   const [error, setError] = useState("");
 
   const selectedQuestion = questions.find((item) => item.id === questionId);
@@ -117,6 +128,41 @@ export function PracticeManager() {
     });
   }
 
+  async function generateQuestions() {
+    if (generating) return;
+    const requestNumber = ++generationRequest.current;
+    setGenerating(true);
+    setGenerationError("");
+    try {
+      const result = await api.generateQuestions(topicId, {
+        count: Number(generationCount),
+        difficulty: generationDifficulty,
+      });
+      if (requestNumber !== generationRequest.current) return;
+      setGeneratedCandidates(result.candidates);
+    } catch (reason) {
+      if (requestNumber !== generationRequest.current) return;
+      setGenerationError(errorMessage(reason));
+    } finally {
+      if (requestNumber === generationRequest.current) setGenerating(false);
+    }
+  }
+
+  function clearGeneration() {
+    generationRequest.current += 1;
+    setGeneratedCandidates([]);
+    setGenerationError("");
+    setGenerating(false);
+  }
+
+  function chooseCandidate(candidate: QuestionGenerationCandidate) {
+    setQuestionForm({
+      prompt: candidate.prompt,
+      answerReference: candidate.answer_reference,
+      difficulty: candidate.difficulty,
+    });
+  }
+
   function chooseSubject(id: string) {
     setSubjectId(id);
     setTopics([]);
@@ -125,6 +171,8 @@ export function PracticeManager() {
     setQuestionId("");
     setAttempts([]);
     setMastery(null);
+    setQuestionForm(emptyQuestion);
+    clearGeneration();
   }
 
   function chooseTopic(id: string) {
@@ -133,6 +181,8 @@ export function PracticeManager() {
     setQuestionId("");
     setAttempts([]);
     setMastery(null);
+    setQuestionForm(emptyQuestion);
+    clearGeneration();
   }
 
   function chooseQuestion(id: string) {
@@ -224,6 +274,55 @@ export function PracticeManager() {
           {topics.map((topic) => <option key={topic.id} value={topic.id}>{topic.name}</option>)}
         </select>
       </div>
+
+      {topicId && <div className="space-y-3" aria-label="Generate practice">
+        <div>
+          <h3>Generate Practice</h3>
+          <p className="empty">
+            Review generated answers carefully. They use Topic metadata and model knowledge,
+            not uploaded course material.
+          </p>
+        </div>
+        <div className="practice-selectors">
+          <select
+            aria-label="Generation count"
+            value={generationCount}
+            onChange={(event) => setGenerationCount(event.target.value)}
+          >
+            {Array.from({ length: 10 }, (_, index) => index + 1).map((value) =>
+              <option key={value} value={value}>{value}</option>
+            )}
+          </select>
+          <select
+            aria-label="Generation difficulty"
+            value={generationDifficulty}
+            onChange={(event) =>
+              setGenerationDifficulty(event.target.value as GenerationDifficulty)
+            }
+          >
+            <option value="mixed">Mixed</option>
+            <option value="easy">Easy</option>
+            <option value="medium">Medium</option>
+            <option value="hard">Hard</option>
+          </select>
+          <button type="button" disabled={generating} onClick={() => void generateQuestions()}>
+            {generating ? "Generating…" : generationError ? "Retry" : "Generate"}
+          </button>
+        </div>
+        {generationError && <p role="alert" className="error-banner">{generationError}</p>}
+        {generatedCandidates.length > 0 && <ul className="item-list" aria-label="Generated candidates">
+          {generatedCandidates.map((candidate, index) => <li key={index}>
+            <div className="item-main">
+              <strong>{candidate.prompt}</strong>
+              <p className="whitespace-pre-wrap">{candidate.answer_reference}</p>
+              <span>{candidate.difficulty}</span>
+              {candidate.duplicate_existing &&
+                <span className="error-banner">Possible duplicate of an existing Question</span>}
+            </div>
+            <button type="button" onClick={() => chooseCandidate(candidate)}>Use candidate</button>
+          </li>)}
+        </ul>}
+      </div>}
 
       {topicId && <form className="question-form" onSubmit={createQuestion}>
         <textarea aria-label="Question prompt" required placeholder="Question prompt" value={questionForm.prompt} onChange={(event) => setQuestionForm({ ...questionForm, prompt: event.target.value })} />

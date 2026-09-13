@@ -38,14 +38,28 @@ class OpenAIProvider:
 
     async def generate(self, request: AIRequest) -> ProviderResponse:
         try:
-            response = await self.client.responses.create(
-                model=self.model_name,
-                instructions=request.system_prompt,
-                input=request.user_prompt,
-                max_output_tokens=request.max_output_tokens,
-                store=False,
-                timeout=self.timeout_seconds,
-            )
+            arguments: dict[str, Any] = {
+                "model": self.model_name,
+                "instructions": request.system_prompt,
+                "input": request.user_prompt,
+                "max_output_tokens": request.max_output_tokens,
+                "store": False,
+                "timeout": self.timeout_seconds,
+            }
+            if request.structured_response is not None:
+                arguments["text"] = {
+                    "format": {
+                        "type": "json_schema",
+                        "name": request.structured_response.schema_name,
+                        "schema": request.structured_response.json_schema,
+                        "strict": request.structured_response.strict,
+                    }
+                }
+            response = await self.client.responses.create(**arguments)
+            if request.structured_response is not None and getattr(
+                response, "status", "completed"
+            ) != "completed":
+                raise AIProviderInvalidResponse(self.provider_name, self.model_name)
             content = response.output_text
             if not isinstance(content, str) or not content.strip():
                 raise AIProviderInvalidResponse(self.provider_name, self.model_name)

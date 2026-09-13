@@ -57,3 +57,13 @@ multi-turn conversation modes remain future Alpha work.
 
 Tutor activity is operational usage, not demonstrated learning. It never creates or changes an
 Attempt or Mastery row and is not translated into `hints_used` or `solution_seen`.
+
+## Sprint 5 Question generation
+
+PALS can generate structured candidate Questions for a selected Topic. Candidates are proposals,
+not learning evidence or persisted drafts. The user sees each prompt and answer reference, may copy
+one into the existing editable Question form, and must explicitly submit the normal Question create
+operation. Generation never creates Attempts, changes Mastery, or affects the deterministic planner.
+
+Generation is based only on Subject/Topic metadata and model knowledge. It is not grounded in course
+documents, and generated answer references may be inaccurate; human review is required.

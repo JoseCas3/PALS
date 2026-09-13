@@ -1,7 +1,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Any, Protocol
+
+
+@dataclass(frozen=True)
+class AIStructuredResponse:
+    schema_name: str
+    json_schema: dict[str, Any]
+    strict: bool = True
 
 
 @dataclass(frozen=True)
@@ -10,6 +17,8 @@ class AIRequest:
     system_prompt: str
     user_prompt: str
     max_output_tokens: int
+    structured_response: AIStructuredResponse | None = None
+    max_output_chars: int = 12_000
 
 
 @dataclass(frozen=True)

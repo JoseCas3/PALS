@@ -33,8 +33,20 @@ class AIInteractionRepository:
         interaction.error_code = None
 
     def finalize_failure(
-        self, interaction: AIInteraction, *, error_code: str, latency_ms: int
+        self,
+        interaction: AIInteraction,
+        *,
+        error_code: str,
+        latency_ms: int,
+        response: AIResponse | None = None,
     ) -> None:
+        if response is not None:
+            interaction.provider = response.provider
+            interaction.model = response.model
+            interaction.output_chars = len(response.content)
+            interaction.input_tokens = response.input_tokens
+            interaction.output_tokens = response.output_tokens
+            interaction.provider_request_id = response.provider_request_id
         interaction.latency_ms = latency_ms
         interaction.success = False
         interaction.error_code = error_code

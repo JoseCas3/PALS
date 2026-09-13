@@ -114,11 +114,21 @@ Additional integrity rules for future tables are deferred with those tables.
 help level, prompt version, input/output character counts, nullable provider token counts,
 latency, request ID, success state, neutral error code, and creation time.
 
-`success IS NULL` is pending, `true` is a completed success, and `false` is a completed provider
-failure. Checks enforce these states and nonnegative metrics. Entity foreign keys are nullable
+`success IS NULL` is pending, `true` is a completed success, and `false` is an unsuccessful AI
+operation, including provider or structured-validation failure. Checks enforce these states and
+nonnegative metrics. Entity foreign keys are nullable
 with `ON DELETE SET NULL`, so Tutor use neither freezes Questions nor blocks otherwise valid
 academic deletion. Metadata remains after references are cleared.
 
 Prompts, academic text, answer references, generated content, exceptions, headers, API keys, and
 arbitrary provider JSON are not stored. Exact transcript reconstruction is intentionally traded
 for privacy and minimal retention.
+
+Sprint 5 reuses this table for `operation = 'question_generation'`. `help_level` is nullable and a
+CHECK requires levels 1 through 6 for `question_tutor` while requiring null for
+`question_generation`. Generation rows use Subject and Topic references with a null Question
+reference. Candidate content, prompts, requested settings, and provenance are not stored.
+
+Migration `20260912_04` introduces these changes. Its downgrade intentionally deletes only
+`question_generation` observability rows before restoring the Tutor-only Sprint 4 constraints;
+academic entities and learning evidence are never deleted by that downgrade.
