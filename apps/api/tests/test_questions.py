@@ -79,6 +79,30 @@ async def test_question_validation(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("field", ["prompt", "answer_reference"])
+async def test_question_rejects_nul_before_persistence(
+    async_client: AsyncClient, field: str
+) -> None:
+    subject = await create_subject(async_client)
+    topic = await create_topic(async_client, subject["id"], "Limits")
+    payload = {
+        "prompt": "Private prompt",
+        "answer_reference": "Private reference",
+        "difficulty": "medium",
+    }
+    payload[field] += "\x00hidden"
+
+    response = await async_client.post(
+        f"/api/v1/topics/{topic['id']}/questions", json=payload
+    )
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "VALIDATION_ERROR"
+    listed = await async_client.get(f"/api/v1/topics/{topic['id']}/questions")
+    assert listed.json() == []
+
+
+@pytest.mark.asyncio
 async def test_question_missing_resources(async_client: AsyncClient) -> None:
     missing_topic = await async_client.post(
         f"/api/v1/topics/{uuid.uuid4()}/questions",

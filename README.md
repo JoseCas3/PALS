@@ -6,13 +6,16 @@ PALS is a personal adaptive learning platform designed to answer:
 
 ## Alpha 0.1 goal
 - Create subjects
-- Create topics/subtopics
+- Create flat topics
 - Create exams
-- Ask a contextual AI tutor
-- Generate questions
-- Record attempts
+- Ask a Question-scoped progressive AI tutor for six help levels
+- Generate transient Question candidates for human review
+- Record immutable, self-reported correctness Attempts
 - Update topic mastery
-- Display basic progress
+- Generate deterministic per-Exam and Global Study Plans
+
+PALS Alpha is local-development software. It is single-user and unauthenticated and must not be
+exposed as a public service. Docker Compose publishes its host ports on `127.0.0.1` only.
 
 ## Initial stack
 - Next.js + React + TypeScript + Tailwind CSS
@@ -76,6 +79,8 @@ From `apps/api`, with Python 3.14:
 
 ```bash
 python -m pip install ".[dev]"
+alembic upgrade head
+alembic check
 python -m pytest
 python -m ruff check .
 python -m mypy app tests
@@ -116,12 +121,16 @@ alembic downgrade base
 alembic upgrade head
 ```
 
-Domain integration tests require PostgreSQL and use `DATABASE_URL`. With the Compose
-database running, the default host URL works:
+Domain integration tests require PostgreSQL and use `DATABASE_URL`. The database must be an
+explicit disposable database whose name ends in `_test`; tests refuse the normal `pals`
+development database and never call `Base.metadata.create_all`. Apply Alembic first:
 
 ```bash
 docker compose up -d postgres
 cd apps/api
+$env:DATABASE_URL="postgresql+asyncpg://pals:pals@localhost:5432/pals_test"
+alembic upgrade head
+alembic check
 python -m pytest
 ```
 

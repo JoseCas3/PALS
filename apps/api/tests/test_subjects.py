@@ -49,6 +49,22 @@ async def test_subject_validation_uses_error_envelope(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"name": "Calculus\x00private"},
+        {"name": "Calculus", "description": "Private\x00description"},
+    ],
+)
+async def test_subject_rejects_nul_before_persistence(
+    async_client: AsyncClient, payload: dict[str, object]
+) -> None:
+    response = await async_client.post("/api/v1/subjects", json=payload)
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "VALIDATION_ERROR"
+
+
+@pytest.mark.asyncio
 async def test_missing_and_invalid_subject_ids(async_client: AsyncClient) -> None:
     missing = await async_client.get(f"/api/v1/subjects/{uuid.uuid4()}")
     assert missing.status_code == 404

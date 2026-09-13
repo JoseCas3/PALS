@@ -69,6 +69,8 @@ export function StudyPlanner({ academicRevision = 0 }: { academicRevision?: numb
 
   function chooseSubject(nextSubjectId: string) {
     planRequest.current += 1;
+    activeExamId.current = "";
+    setGenerating(false);
     setSubjectId(nextSubjectId);
     setExams([]);
     setExamId("");
@@ -78,6 +80,8 @@ export function StudyPlanner({ academicRevision = 0 }: { academicRevision?: numb
 
   function chooseExam(nextExamId: string) {
     planRequest.current += 1;
+    activeExamId.current = nextExamId;
+    setGenerating(false);
     setExamId(nextExamId);
     setPlan(null);
     setError("");

@@ -535,6 +535,70 @@ describe("PracticeManager", () => {
     expect(screen.getByLabelText("Question prompt")).toHaveValue("New Topic Draft");
   });
 
+  it("publishes same-Topic Attempt evidence without contaminating the newly selected Question", async () => {
+    const secondQuestion = { ...question, id: "question-2", prompt: "What is continuity?" };
+    const onAttemptRecorded = vi.fn();
+    let resolveAttempt: ((value: object) => void) | undefined;
+    const pendingAttempt = new Promise<object>((resolve) => { resolveAttempt = resolve; });
+    const fetchMock = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      const url = input.toString();
+      if (init?.method === "POST" && url.endsWith("/questions/question-1/attempts")) return pendingAttempt;
+      if (url.endsWith("/subjects")) return jsonResponse([subject]);
+      if (url.endsWith("/subjects/subject-1/topics")) return jsonResponse([topic]);
+      if (url.endsWith("/topics/topic-1/questions")) return jsonResponse([question, secondQuestion]);
+      if (url.endsWith("/topics/topic-1/mastery")) return jsonResponse({ topic_id: topic.id, score: "10.00", updated_at: null });
+      if (url.endsWith("/questions/question-1/attempts") || url.endsWith("/questions/question-2/attempts")) return jsonResponse([]);
+      return jsonResponse({ error: { message: "Unexpected request" } }, 500);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    renderPractice({ onAttemptRecorded });
+
+    await screen.findByText("Show answer reference");
+    fireEvent.click(screen.getByRole("button", { name: "Record attempt" }));
+    fireEvent.click(screen.getByRole("button", { name: /What is continuity/ }));
+    expect(screen.getByRole("button", { name: "Record attempt" })).toBeEnabled();
+
+    resolveAttempt?.(jsonResponse({
+      attempt: { id: "attempt-q1", question_id: question.id, correct: true, hints_used: 0, solution_seen: false, time_spent_seconds: 0, created_at: "2026-09-12T00:00:00Z" },
+      mastery: { topic_id: topic.id, score: "25.00", updated_at: "2026-09-12T00:00:00Z" },
+    }, 201));
+
+    await waitFor(() => expect(screen.getByLabelText("Current mastery")).toHaveTextContent("25.00"));
+    expect(onAttemptRecorded).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText(/Attempt recorded/)).not.toBeInTheDocument();
+    expect(screen.queryByText("0 hints · solution hidden · 0s")).not.toBeInTheDocument();
+  });
+
+  it("does not let an older Attempt history read overwrite a successful write", async () => {
+    let resolveHistory: ((value: object) => void) | undefined;
+    let resolveAttempt: ((value: object) => void) | undefined;
+    const pendingHistory = new Promise<object>((resolve) => { resolveHistory = resolve; });
+    const pendingAttempt = new Promise<object>((resolve) => { resolveAttempt = resolve; });
+    const fetchMock = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      const url = input.toString();
+      if (init?.method === "POST" && url.endsWith("/questions/question-1/attempts")) return pendingAttempt;
+      if (url.endsWith("/subjects")) return jsonResponse([subject]);
+      if (url.endsWith("/subjects/subject-1/topics")) return jsonResponse([topic]);
+      if (url.endsWith("/topics/topic-1/questions")) return jsonResponse([question]);
+      if (url.endsWith("/topics/topic-1/mastery")) return jsonResponse({ topic_id: topic.id, score: "0.00", updated_at: null });
+      if (url.endsWith("/questions/question-1/attempts")) return pendingHistory;
+      return jsonResponse({ error: { message: "Unexpected request" } }, 500);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    renderPractice();
+
+    await screen.findByText("Show answer reference");
+    fireEvent.click(screen.getByRole("button", { name: "Record attempt" }));
+    resolveAttempt?.(jsonResponse({
+      attempt: { id: "new-attempt", question_id: question.id, correct: true, hints_used: 0, solution_seen: false, time_spent_seconds: 12, created_at: "2026-09-12T00:00:00Z" },
+      mastery: { topic_id: topic.id, score: "8.00", updated_at: "2026-09-12T00:00:00Z" },
+    }, 201));
+    expect(await screen.findByText("0 hints · solution hidden · 12s")).toBeInTheDocument();
+
+    resolveHistory?.(jsonResponse([]));
+    await waitFor(() => expect(screen.getByText("0 hints · solution hidden · 12s")).toBeInTheDocument());
+  });
+
   it.each(["update", "delete"] as const)(
     "does not let a delayed old-Topic Question %s overwrite the new Topic",
     async (operation) => {

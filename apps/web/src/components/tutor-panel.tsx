@@ -56,6 +56,7 @@ function TutorPanelState({ questionId }: { questionId: string }) {
             type="button"
             role="radio"
             aria-checked={helpLevel === level.value}
+            disabled={loading}
             className={helpLevel === level.value ? "selected" : ""}
             onClick={() => setHelpLevel(level.value)}
           >

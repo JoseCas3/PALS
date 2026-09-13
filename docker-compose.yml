@@ -6,7 +6,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-pals}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pals}
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pals} -d ${POSTGRES_DB:-pals}"]
       interval: 5s
@@ -26,7 +26,7 @@ services:
       AI_API_KEY: ${AI_API_KEY:-}
       AI_TIMEOUT_SECONDS: ${AI_TIMEOUT_SECONDS:-20}
     ports:
-      - "${API_PORT:-8000}:8000"
+      - "127.0.0.1:${API_PORT:-8000}:8000"
     command: >-
       sh -c "alembic upgrade head &&
       python -m uvicorn app.main:app --host 0.0.0.0 --port 8000"
@@ -42,7 +42,7 @@ services:
     environment:
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
     ports:
-      - "${WEB_PORT:-3000}:3000"
+      - "127.0.0.1:${WEB_PORT:-3000}:3000"
     depends_on:
       api:
         condition: service_started

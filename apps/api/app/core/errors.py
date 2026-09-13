@@ -1,11 +1,15 @@
+import logging
 from typing import Any
 
 from fastapi import Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.schemas.common import ErrorBody, ErrorResponse
+
+logger = logging.getLogger(__name__)
 
 
 class ApplicationError(Exception):
@@ -39,3 +43,21 @@ async def validation_error_handler(_: Request, exc: Exception) -> JSONResponse:
         )
     )
     return JSONResponse(status_code=422, content=body.model_dump(mode="json"))
+
+
+async def database_error_handler(request: Request, exc: Exception) -> JSONResponse:
+    if not isinstance(exc, SQLAlchemyError):
+        raise exc
+    logger.error(
+        "Unexpected database failure while handling %s %s (%s)",
+        request.method,
+        request.url.path,
+        type(exc).__name__,
+    )
+    body = ErrorResponse(
+        error=ErrorBody(
+            code="DATABASE_ERROR",
+            message="A database operation failed",
+        )
+    )
+    return JSONResponse(status_code=500, content=body.model_dump(mode="json"))

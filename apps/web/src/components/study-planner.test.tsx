@@ -78,6 +78,32 @@ describe("StudyPlanner", () => {
     expect(screen.getByLabelText("Planner exam")).toHaveValue(secondExam.id);
   });
 
+  it("recovers generation after switching Exams during a pending plan", async () => {
+    let resolveOldPlan: ((value: object) => void) | undefined;
+    const pendingOldPlan = new Promise<object>((resolve) => { resolveOldPlan = resolve; });
+    const secondPlan = { ...planResponse(), exam_id: secondExam.id, exam_name: secondExam.name };
+    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+      const url = input.toString();
+      if (url.endsWith("/subjects")) return jsonResponse([subject]);
+      if (url.endsWith("/subjects/subject-1/exams")) return jsonResponse([firstExam, secondExam]);
+      if (url.endsWith("/exams/exam-1/study-plan")) return pendingOldPlan;
+      if (url.endsWith("/exams/exam-2/study-plan")) return jsonResponse(secondPlan);
+      return jsonResponse({ error: { message: "Unexpected request" } }, 500);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<StudyPlanner />);
+
+    fireEvent.click(await enabledGenerateButton());
+    fireEvent.change(screen.getByLabelText("Planner exam"), { target: { value: secondExam.id } });
+    const recoveredButton = screen.getByRole("button", { name: "Generate study plan" });
+    expect(recoveredButton).toBeEnabled();
+    fireEvent.click(recoveredButton);
+    expect(await screen.findByRole("heading", { name: "Retake" })).toBeInTheDocument();
+
+    resolveOldPlan?.(jsonResponse(planResponse()));
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Retake" })).toBeInTheDocument());
+  });
+
   it("renders an empty plan", async () => {
     vi.stubGlobal("fetch", standardFetch({ ...planResponse(), items: [] }));
     render(<StudyPlanner />);

@@ -16,7 +16,7 @@ export default defineConfig({
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: {
-    command: "npm run dev -- --port 3100",
+    command: "npx next dev --hostname 127.0.0.1 --port 3100",
     cwd: path.resolve(__dirname),
     env: {
       ...process.env,

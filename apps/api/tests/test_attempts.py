@@ -1,8 +1,11 @@
+import logging
 import uuid
 
 import pytest
 from httpx import AsyncClient
+from sqlalchemy.exc import DBAPIError
 
+from app.services.attempts import AttemptService
 from tests.test_exam_topics import create_topic
 from tests.test_questions import create_question
 from tests.test_subjects import create_subject
@@ -81,3 +84,56 @@ async def test_attempt_missing_question(async_client: AsyncClient) -> None:
     assert (
         await async_client.get(f"/api/v1/questions/{uuid.uuid4()}/attempts")
     ).status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_attempt_rejects_postgresql_integer_overflow(async_client: AsyncClient) -> None:
+    subject = await create_subject(async_client)
+    topic = await create_topic(async_client, subject["id"], "Limits")
+    question = await create_question(async_client, topic["id"])
+
+    response = await async_client.post(
+        f"/api/v1/questions/{question['id']}/attempts",
+        json={**ATTEMPT, "time_spent_seconds": 2_147_483_648},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "VALIDATION_ERROR"
+
+
+@pytest.mark.asyncio
+async def test_unexpected_database_failure_is_safe_for_clients_and_logs(
+    async_client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    private_prompt = "PRIVATE_QUESTION_PROMPT"
+    private_reference = "PRIVATE_ANSWER_REFERENCE"
+
+    async def fail_record(*_: object, **__: object) -> object:
+        raise DBAPIError(
+            "INSERT INTO questions (prompt, answer_reference) VALUES ($1, $2)",
+            (private_prompt, private_reference),
+            RuntimeError("database rejected private academic text"),
+            False,
+        )
+
+    monkeypatch.setattr(AttemptService, "record", fail_record)
+    caplog.set_level(logging.ERROR, logger="app.core.errors")
+
+    response = await async_client.post(
+        f"/api/v1/questions/{uuid.uuid4()}/attempts", json=ATTEMPT
+    )
+
+    assert response.status_code == 500
+    assert response.json() == {
+        "error": {
+            "code": "DATABASE_ERROR",
+            "message": "A database operation failed",
+            "details": None,
+        }
+    }
+    assert private_prompt not in response.text
+    assert private_reference not in response.text
+    assert private_prompt not in caplog.text
+    assert private_reference not in caplog.text

@@ -27,3 +27,7 @@ Sprint 7 closes with the full backend and frontend suites, migration drift check
 pass, and `npm run test:e2e`. The Playwright test provisions a disposable PostgreSQL/API stack,
 runs the real browser flow without an AI key, and removes that stack afterward. A short human pass
 then checks hierarchy, selected-context clarity, conflict feedback, and narrow-screen usability.
+
+Backend pytest runs only against an explicitly selected disposable PostgreSQL database whose name
+ends in `_test`. Apply all Alembic migrations and run `alembic check` before pytest; the test setup
+must not call ORM `create_all` or point at the normal Alpha development database.

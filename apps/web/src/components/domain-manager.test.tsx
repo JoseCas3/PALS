@@ -83,6 +83,36 @@ describe("DomainManager", () => {
     );
     expect(onPlannerInputsChanged).toHaveBeenCalledTimes(1);
   });
+
+  it("does not publish a delayed Exam assignment into a newly selected Exam", async () => {
+    const onPlannerInputsChanged = vi.fn();
+    const subject = entity("subject-1", "Calculus");
+    const topic = { ...entity("topic-1", "Limits"), subject_id: subject.id };
+    const firstExam = { ...entity("exam-1", "Final"), subject_id: subject.id, exam_date: "2026-12-01T15:00:00Z" };
+    const secondExam = { ...entity("exam-2", "Retake"), subject_id: subject.id, exam_date: "2026-12-08T15:00:00Z" };
+    let resolveAssignment: ((value: object) => void) | undefined;
+    const pendingAssignment = new Promise<object>((resolve) => { resolveAssignment = resolve; });
+    const fetchMock = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      const url = input.toString();
+      if (init?.method === "PUT") return pendingAssignment;
+      if (url.endsWith("/subjects")) return jsonResponse([subject]);
+      if (url.endsWith("/subjects/subject-1/topics")) return jsonResponse([topic]);
+      if (url.endsWith("/subjects/subject-1/exams")) return jsonResponse([firstExam, secondExam]);
+      if (url.endsWith("/exams/exam-1/topics") || url.endsWith("/exams/exam-2/topics")) return jsonResponse([]);
+      return jsonResponse({ error: { message: "Unexpected request" } }, 500);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    renderDomain({ initialSubjectId: subject.id, onPlannerInputsChanged });
+
+    await screen.findByRole("heading", { name: "Weighted topics" });
+    fireEvent.change(screen.getByLabelText("Topic to assign"), { target: { value: topic.id } });
+    fireEvent.click(screen.getByRole("button", { name: "Save weight" }));
+    fireEvent.click(screen.getByRole("button", { name: /Retake/ }));
+    resolveAssignment?.(jsonResponse({ exam_id: firstExam.id, topic_id: topic.id, weight: 1 }));
+
+    await waitFor(() => expect(onPlannerInputsChanged).toHaveBeenCalledTimes(1));
+    expect(screen.queryByText("Weight 1")).not.toBeInTheDocument();
+  });
 });
 
 function renderDomain({

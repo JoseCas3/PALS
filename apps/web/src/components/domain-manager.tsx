@@ -37,9 +37,17 @@ export function DomainManager({
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const activeSubjectId = useRef(selectedSubjectId);
+  const activeTopicId = useRef(selectedTopicId);
+  const activeExamId = useRef(selectedExamId);
   useLayoutEffect(() => {
     activeSubjectId.current = selectedSubjectId;
   }, [selectedSubjectId]);
+  useLayoutEffect(() => {
+    activeTopicId.current = selectedTopicId;
+  }, [selectedTopicId]);
+  useLayoutEffect(() => {
+    activeExamId.current = selectedExamId;
+  }, [selectedExamId]);
 
   const selectedSubject = subjects.find((item) => item.id === selectedSubjectId);
   const selectedExam = exams.find((item) => item.id === selectedExamId);
@@ -94,104 +102,151 @@ export function DomainManager({
 
   async function createSubject(event: FormEvent) {
     event.preventDefault();
+    const subjectId = selectedSubjectId;
+    const form = subjectForm;
     await act(async () => {
-      const created = await api.createSubject(subjectForm);
+      const created = await api.createSubject(form);
       setSubjects((items) => [...items, created]);
+      onAcademicDataChanged?.();
+      if (activeSubjectId.current !== subjectId) return;
       chooseSubject(created.id);
       setSubjectForm(emptyForm);
-      onAcademicDataChanged?.();
-    });
+    }, () => activeSubjectId.current === subjectId);
   }
 
   async function createTopic(event: FormEvent) {
     event.preventDefault();
+    const subjectId = selectedSubjectId;
+    const topicId = selectedTopicId;
+    const form = topicForm;
     await act(async () => {
-      const created = await api.createTopic(selectedSubjectId, topicForm);
-      setTopics((items) => [...items, created]);
-      onTopicSelected(selectedSubjectId, created.id);
-      setTopicForm(emptyForm);
+      const created = await api.createTopic(subjectId, form);
       onAcademicDataChanged?.();
-    });
+      if (
+        activeSubjectId.current !== subjectId ||
+        activeTopicId.current !== topicId
+      ) return;
+      setTopics((items) => [...items, created]);
+      onTopicSelected(subjectId, created.id);
+      setTopicForm(emptyForm);
+    }, () => activeSubjectId.current === subjectId && activeTopicId.current === topicId);
   }
 
   async function createExam(event: FormEvent) {
     event.preventDefault();
+    const subjectId = selectedSubjectId;
+    const examId = selectedExamId;
+    const form = examForm;
     await act(async () => {
-      const created = await api.createExam(selectedSubjectId, {
-        name: examForm.name,
-        description: examForm.description,
-        exam_date: new Date(examForm.examDate).toISOString(),
+      const created = await api.createExam(subjectId, {
+        name: form.name,
+        description: form.description,
+        exam_date: new Date(form.examDate).toISOString(),
       });
-      setExams((items) => [...items, created]);
-      setSelectedExamId(created.id);
-      setExamForm({ ...emptyForm, examDate: "" });
       onAcademicDataChanged?.();
       onPlannerInputsChanged?.();
-    });
+      if (!isActiveExam(subjectId, examId)) return;
+      setExams((items) => [...items, created]);
+      activeExamId.current = created.id;
+      setSelectedExamId(created.id);
+      setExamForm({ ...emptyForm, examDate: "" });
+    }, () => isActiveExam(subjectId, examId));
   }
 
   async function assignTopic(event: FormEvent) {
     event.preventDefault();
+    const subjectId = selectedSubjectId;
+    const examId = selectedExamId;
+    const submittedAssignment = assignment;
     await act(async () => {
       const saved = await api.putExamTopic(
-        selectedExamId,
-        assignment.topicId,
-        Number(assignment.weight),
+        examId,
+        submittedAssignment.topicId,
+        Number(submittedAssignment.weight),
       );
-      setAssignments((items) => [...items.filter((item) => item.topic_id !== saved.topic_id), saved]);
       onPlannerInputsChanged?.();
-    });
+      if (!isActiveExam(subjectId, examId)) return;
+      setAssignments((items) => [...items.filter((item) => item.topic_id !== saved.topic_id), saved]);
+    }, () => isActiveExam(subjectId, examId));
   }
 
   async function rename(kind: "subject" | "topic" | "exam", id: string, current: string) {
     const name = window.prompt("New name", current)?.trim();
     if (!name || name === current) return;
+    const subjectId = selectedSubjectId;
+    const topicId = selectedTopicId;
+    const examId = selectedExamId;
     await act(async () => {
       if (kind === "subject") {
         const saved = await api.updateSubject(id, { name });
         setSubjects((items) => replace(items, saved));
       } else if (kind === "topic") {
         const saved = await api.updateTopic(id, { name });
-        setTopics((items) => replace(items, saved));
+        if (activeSubjectId.current === subjectId) {
+          setTopics((items) => replace(items, saved));
+        }
       } else {
         const saved = await api.updateExam(id, { name });
-        setExams((items) => replace(items, saved));
+        if (isActiveExam(subjectId, examId)) {
+          setExams((items) => replace(items, saved));
+        }
       }
       onAcademicDataChanged?.();
       onPlannerInputsChanged?.();
-    });
+    }, () => kind === "exam"
+      ? isActiveExam(subjectId, examId)
+      : activeSubjectId.current === subjectId && (
+        kind === "subject" || activeTopicId.current === topicId
+      ));
   }
 
   async function remove(kind: "subject" | "topic" | "exam", id: string) {
     if (!window.confirm("Delete this item?")) return;
+    const subjectId = selectedSubjectId;
+    const topicId = selectedTopicId;
     await act(async () => {
       if (kind === "subject") {
         await api.deleteSubject(id);
         setSubjects((items) => items.filter((item) => item.id !== id));
-        if (selectedSubjectId === id) onSubjectSelected("");
+        if (activeSubjectId.current === id) onSubjectSelected("");
       } else if (kind === "topic") {
         await api.deleteTopic(id);
-        setTopics((items) => items.filter((item) => item.id !== id));
-        if (selectedTopicId === id) onTopicSelected(selectedSubjectId, "");
+        if (activeSubjectId.current === subjectId) {
+          setTopics((items) => items.filter((item) => item.id !== id));
+          if (activeTopicId.current === id) onTopicSelected(subjectId, "");
+        }
       } else {
         await api.deleteExam(id);
-        setExams((items) => items.filter((item) => item.id !== id));
-        if (selectedExamId === id) setSelectedExamId("");
         onPlannerInputsChanged?.();
+        if (activeSubjectId.current === subjectId) {
+          setExams((items) => items.filter((item) => item.id !== id));
+          if (activeExamId.current === id) {
+            activeExamId.current = "";
+            setSelectedExamId("");
+          }
+        }
       }
       onAcademicDataChanged?.();
-    });
+    }, () => activeSubjectId.current === subjectId && (
+      kind !== "topic" || activeTopicId.current === topicId
+    ));
   }
 
   async function removeAssignment(topicId: string) {
+    const subjectId = selectedSubjectId;
+    const examId = selectedExamId;
     await act(async () => {
-      await api.deleteExamTopic(selectedExamId, topicId);
-      setAssignments((items) => items.filter((item) => item.topic_id !== topicId));
+      await api.deleteExamTopic(examId, topicId);
       onPlannerInputsChanged?.();
-    });
+      if (!isActiveExam(subjectId, examId)) return;
+      setAssignments((items) => items.filter((item) => item.topic_id !== topicId));
+    }, () => isActiveExam(subjectId, examId));
   }
 
   function chooseSubject(id: string) {
+    activeSubjectId.current = id;
+    activeTopicId.current = "";
+    activeExamId.current = "";
     onSubjectSelected(id);
     setTopics([]);
     setExams([]);
@@ -200,16 +255,21 @@ export function DomainManager({
   }
 
   function chooseExam(id: string) {
+    activeExamId.current = id;
     setSelectedExamId(id);
     setAssignments([]);
   }
 
-  async function act(action: () => Promise<void>) {
+  function isActiveExam(subjectId: string, examId: string): boolean {
+    return activeSubjectId.current === subjectId && activeExamId.current === examId;
+  }
+
+  async function act(action: () => Promise<void>, publishError = () => true) {
     setError("");
     try {
       await action();
     } catch (reason) {
-      setError(errorMessage(reason));
+      if (publishError()) setError(errorMessage(reason));
     }
   }
 

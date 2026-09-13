@@ -4,7 +4,11 @@
 Modular monolith.
 
 ## High level
-Browser → Next.js → FastAPI → PostgreSQL
+
+- Next.js serves the browser UI.
+- Browser client components call FastAPI directly over JSON using `NEXT_PUBLIC_API_URL`.
+- FastAPI owns domain operations and PostgreSQL access.
+- FastAPI may call the provider-neutral AI Gateway for optional Tutor and Generation requests.
 
 FastAPI modules:
 - subjects
@@ -116,3 +120,9 @@ Practice requests and writes capture their initiating Topic, Question where appl
 generation. Valid backend writes finish normally, but delayed results or errors cannot mutate a
 newer UI context. A successful Attempt always advances the planner revision even if the user has
 already navigated elsewhere because its persisted evidence remains authoritative.
+
+Attempt completion has three separate publication scopes: every successful write refreshes the
+Global Planner; its returned Mastery updates only while the initiating Topic remains active; and
+Attempt history, form reset, and success feedback update only while the initiating Question remains
+active. Attempt history reads carry a write revision so a pre-write snapshot cannot replace newer
+post-write state.

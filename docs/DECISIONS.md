@@ -133,3 +133,21 @@ Alpha capability.
 Async Practice operations are context guarded. Completed writes remain valid on the server, but
 old-context results and errors cannot contaminate the current Topic. Successful Attempts always
 refresh the Global Planner because they are valid evidence even after navigation.
+
+## ADR-025 Alpha hardening boundaries
+
+Accepted. Browser operation state is scoped separately from valid server mutation completion.
+Academic writes publish global revision notifications after success, while entity data, forms, and
+errors are published only into their initiating Subject/Exam context. Development and E2E host
+ports bind to loopback because Alpha is unauthenticated local software.
+
+Persisted academic text rejects embedded NUL before database execution, PostgreSQL `INTEGER`
+limits bound Attempt time, SQL parameters are hidden, and unexpected SQLAlchemy failures return a
+generic PALS error envelope. Backend integration tests require an explicit `_test` PostgreSQL
+database migrated by Alembic and never repair schema with ORM metadata.
+
+The frontend npm lockfile remains authoritative for JavaScript dependencies. Python direct
+dependencies are exactly pinned, but a transitive backend lock is deferred before Beta because
+adding a new resolver workflow is beyond this focused remediation. ExamTopic request transport
+continues to cross a float boundary; a decimal-safe public transport is deferred API debt, while
+planner calculations over persisted values remain exact and deterministic.

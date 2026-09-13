@@ -71,6 +71,7 @@ export function PracticeManager({
 
   const contextGeneration = useRef(0);
   const generationRequest = useRef(0);
+  const attemptHistoryRevision = useRef(0);
   const subjectRequest = useRef(0);
   const topicRequest = useRef(0);
   const activeTopicId = useRef(selectedTopicId);
@@ -173,6 +174,7 @@ export function PracticeManager({
 
   useEffect(() => {
     const requestedQuestionId = questionId;
+    const requestedRevision = attemptHistoryRevision.current;
     queueMicrotask(() => {
       if (activeQuestionId.current !== requestedQuestionId) return;
       setAttempts([]);
@@ -184,7 +186,11 @@ export function PracticeManager({
     void api
       .listAttempts(requestedQuestionId)
       .then((items) => {
-        if (!ignore && activeQuestionId.current === requestedQuestionId) setAttempts(items);
+        if (
+          !ignore &&
+          activeQuestionId.current === requestedQuestionId &&
+          attemptHistoryRevision.current === requestedRevision
+        ) setAttempts(items);
       })
       .catch((reason: unknown) => {
         if (!ignore && activeQuestionId.current === requestedQuestionId) {
@@ -266,9 +272,11 @@ export function PracticeManager({
   }
 
   function chooseQuestion(id: string) {
+    activeQuestionId.current = id;
     setQuestionId(id);
     setAttempts([]);
     setAttemptForm(emptyAttempt);
+    setSubmittingAttempt(false);
     setSuccess("");
     setError("");
   }
@@ -340,11 +348,10 @@ export function PracticeManager({
         time_spent_seconds: Number(form.timeSpentSeconds),
       });
       onAttemptRecorded?.();
-      if (
-        !isActiveTopic(topicId, generation) ||
-        activeQuestionId.current !== requestedQuestionId
-      ) return;
+      if (!isActiveTopic(topicId, generation)) return;
       setMastery(result.mastery);
+      if (activeQuestionId.current !== requestedQuestionId) return;
+      attemptHistoryRevision.current += 1;
       setAttempts((items) => [result.attempt, ...items]);
       setAttemptForm(emptyAttempt);
       setSuccess(`Attempt recorded. Mastery updated to ${result.mastery.score}.`);

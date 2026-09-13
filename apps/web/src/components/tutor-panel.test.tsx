@@ -20,6 +20,13 @@ describe("TutorPanel", () => {
 
     fireEvent.click(screen.getByRole("radio", { name: /5\. Guided/ }));
     fireEvent.click(screen.getByRole("button", { name: "Get help" }));
+    expect(screen.getByRole("radio", { name: /5\. Guided/ })).toBeDisabled();
+    expect(screen.getByRole("radio", { name: /2\. Principle/ })).toBeDisabled();
+    fireEvent.click(screen.getByRole("radio", { name: /2\. Principle/ }));
+    expect(screen.getByRole("radio", { name: /5\. Guided/ })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
     fireEvent.click(screen.getByRole("button", { name: "Getting help…" }));
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock).toHaveBeenCalledWith(

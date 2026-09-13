@@ -6,10 +6,11 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
 from app.models.question import QuestionDifficulty
+from app.schemas.common import reject_nul
 
 
 def _nonblank(value: str, label: str) -> str:
-    value = value.strip()
+    value = str(reject_nul(value)).strip()
     if not value:
         raise ValueError(f"{label} must not be blank")
     return value

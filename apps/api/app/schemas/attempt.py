@@ -12,7 +12,7 @@ class AttemptCreate(BaseModel):
     correct: StrictBool
     hints_used: int = Field(ge=0, le=3)
     solution_seen: StrictBool
-    time_spent_seconds: int = Field(ge=0)
+    time_spent_seconds: int = Field(ge=0, le=2_147_483_647)
 
 
 class AttemptResponse(BaseModel):

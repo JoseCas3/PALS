@@ -5,6 +5,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from app.schemas.common import reject_nul
+
 
 class SubjectCreate(BaseModel):
     name: str = Field(max_length=255)
@@ -13,10 +15,15 @@ class SubjectCreate(BaseModel):
     @field_validator("name")
     @classmethod
     def validate_name(cls, value: str) -> str:
-        value = value.strip()
+        value = str(reject_nul(value)).strip()
         if not value:
             raise ValueError("Name must not be blank")
         return value
+
+    @field_validator("description")
+    @classmethod
+    def validate_description(cls, value: str | None) -> str | None:
+        return reject_nul(value)
 
 
 class SubjectUpdate(BaseModel):
@@ -28,10 +35,15 @@ class SubjectUpdate(BaseModel):
     def validate_name(cls, value: str | None) -> str | None:
         if value is None:
             raise ValueError("Name must not be null")
-        value = value.strip()
+        value = str(reject_nul(value)).strip()
         if not value:
             raise ValueError("Name must not be blank")
         return value
+
+    @field_validator("description")
+    @classmethod
+    def validate_description(cls, value: str | None) -> str | None:
+        return reject_nul(value)
 
     @model_validator(mode="after")
     def require_change(self) -> SubjectUpdate:
