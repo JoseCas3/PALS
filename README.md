@@ -143,3 +143,15 @@ Sprint 3 adds a deterministic, read-only Study Plan for an Exam at
 Mastery need, a linear 30-day Exam urgency, and ExamTopic weight, then explains which weighted
 factor contributes most. Plans are calculated on demand and are never persisted. The home page
 provides a minimal Subject-to-Exam planner that preserves the server ranking.
+
+## Sprint 4 AI Gateway and Question Tutor
+
+Sprint 4 adds question-scoped progressive Tutor help at levels 1 through 6 through a
+provider-neutral AI Gateway and one OpenAI Responses API adapter. The configured model is not a
+domain rule. Tutor output is plain text, non-streaming, and never changes Attempts, Mastery,
+Questions, ExamTopic assignments, or Study Plans.
+
+Tutor calls store metadata-only `AIInteraction` rows for operational observability. Prompts,
+answer references, generated content, secrets, and provider payloads are not persisted. The API
+still boots and all non-AI features work without `AI_API_KEY`; Tutor requests then return a safe
+503 response.

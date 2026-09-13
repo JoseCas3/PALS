@@ -9,9 +9,9 @@ from app.api.dependencies import get_session
 from app.core.config import get_settings
 from app.db.base import Base
 from app.main import app as fastapi_app
-from app.models import Attempt, Exam, ExamTopic, Mastery, Question, Subject, Topic
+from app.models import AIInteraction, Attempt, Exam, ExamTopic, Mastery, Question, Subject, Topic
 
-_MODELS = (Attempt, Exam, ExamTopic, Mastery, Question, Subject, Topic)
+_MODELS = (AIInteraction, Attempt, Exam, ExamTopic, Mastery, Question, Subject, Topic)
 test_engine = create_async_engine(get_settings().database_url, poolclass=NullPool)
 
 

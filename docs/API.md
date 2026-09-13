@@ -96,7 +96,24 @@ no writes and uses no AI.
 
 ## Deferred Alpha 0.1 endpoints
 
-Tutor endpoints are deferred beyond Sprint 3.
+Topic Tutor, conversations, general chat, AI grading, and Question generation remain deferred.
+
+## Question Tutor
+
+- `POST /questions/{question_id}/tutor` -> 200
+
+The request is `{"help_level": 1}` with a strict integer from 1 through 6. The response contains
+interaction and Question IDs, level, plain-text content, provider, configured/returned model,
+prompt version `question_tutor.v1`, and creation time. Responses use `Cache-Control: no-store`.
+
+Levels provide, in order: conceptual hint, principle/formula, strategy, first concrete step,
+guided solution without the final answer, and full solution. Levels 1 through 4 never send the
+Question answer reference to the provider. Levels 5 and 6 include it in a separate trusted-data
+block; level 5 still withholds the final answer.
+
+Oversized Tutor context returns 422 `TUTOR_CONTEXT_TOO_LARGE`. Provider errors map to 502 or 503;
+timeouts return 504. Safe provider errors may include the interaction ID in `details`. Missing AI
+configuration returns 503 `AI_PROVIDER_UNAVAILABLE` without affecting other endpoints.
 
 ## Health
 

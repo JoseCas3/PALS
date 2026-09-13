@@ -64,6 +64,17 @@ export type AttemptResult = {
   mastery: Mastery;
 };
 
+export type TutorResponse = {
+  interaction_id: string;
+  question_id: string;
+  help_level: number;
+  content: string;
+  provider: string;
+  model: string;
+  prompt_version: string;
+  created_at: string;
+};
+
 export type PlannerFactorCode = "mastery_need" | "urgency" | "exam_weight";
 
 export type PlannerReasonFactor = {

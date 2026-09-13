@@ -11,6 +11,7 @@ import type {
   Subject,
   Topic,
 } from "../lib/types";
+import { TutorPanel } from "./tutor-panel";
 
 const emptyQuestion = {
   prompt: "",
@@ -248,7 +249,14 @@ export function PracticeManager() {
         <div>
           <h3>Attempt</h3>
           {!selectedQuestion ? <p className="empty">Select a question to practice.</p> : <>
-            <div className="question-detail"><strong>{selectedQuestion.prompt}</strong><p>Answer reference: {selectedQuestion.answer_reference}</p></div>
+            <div className="question-detail">
+              <strong>{selectedQuestion.prompt}</strong>
+              <details className="answer-reference">
+                <summary>Show answer reference</summary>
+                <p>{selectedQuestion.answer_reference}</p>
+              </details>
+            </div>
+            <TutorPanel questionId={selectedQuestion.id} />
             <form className="attempt-form" onSubmit={recordAttempt}>
               <select aria-label="Attempt correctness" value={attemptForm.correct} onChange={(event) => setAttemptForm({ ...attemptForm, correct: event.target.value })}>
                 <option value="true">Correct</option><option value="false">Incorrect</option>

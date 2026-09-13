@@ -43,7 +43,8 @@ describe("PracticeManager", () => {
     vi.stubGlobal("fetch", fetchMock);
     render(<PracticeManager />);
 
-    await screen.findByText("Answer reference: A value approached by a function.");
+    await screen.findByText("Show answer reference");
+    expect(screen.getByText("A value approached by a function.")).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Hints used"), { target: { value: "1" } });
     fireEvent.change(screen.getByLabelText("Time spent seconds"), {
       target: { value: "45" },
@@ -105,6 +106,46 @@ describe("PracticeManager", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Add question" }));
     await screen.findByText("New prompt");
+  });
+
+  it("keeps Tutor help separate from Attempt fields and hides the answer by default", async () => {
+    const fetchMock = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      const url = input.toString();
+      if (init?.method === "POST" && url.endsWith("/questions/question-1/tutor")) {
+        return jsonResponse({
+          interaction_id: "interaction-1",
+          question_id: question.id,
+          help_level: 6,
+          content: "Complete solution",
+          provider: "fake",
+          model: "fake-model",
+          prompt_version: "question_tutor.v1",
+          created_at: "2026-09-12T00:00:00Z",
+        });
+      }
+      if (url.endsWith("/subjects")) return jsonResponse([subject]);
+      if (url.endsWith("/subjects/subject-1/topics")) return jsonResponse([topic]);
+      if (url.endsWith("/topics/topic-1/questions")) return jsonResponse([question]);
+      if (url.endsWith("/topics/topic-1/mastery")) {
+        return jsonResponse({ topic_id: topic.id, score: "0.00", updated_at: null });
+      }
+      if (url.endsWith("/questions/question-1/attempts")) return jsonResponse([]);
+      return jsonResponse({ error: { message: "Unexpected request" } }, 500);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<PracticeManager />);
+
+    const disclosure = await screen.findByText("Show answer reference");
+    const details = disclosure.closest("details");
+    expect(details).not.toHaveAttribute("open");
+    fireEvent.click(disclosure);
+    expect(details).toHaveAttribute("open");
+
+    fireEvent.click(screen.getByRole("radio", { name: /6\. Full solution/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Get help" }));
+    await screen.findByText("Complete solution");
+    expect(screen.getByLabelText("Hints used")).toHaveValue("0");
+    expect(screen.getByLabelText("Solution seen")).not.toBeChecked();
   });
 });
 

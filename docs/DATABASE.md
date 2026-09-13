@@ -105,7 +105,20 @@ The following remain planned but are not part of Sprint 3:
 - Topic hierarchy (`parent_topic_id`) and importance
 - Exam target and maximum scores
 - Study sessions
-- AI interaction logging
 
-Later integrity rules, including mastery ranges and transactional attempt/mastery updates, are
-deferred with those tables.
+Additional integrity rules for future tables are deferred with those tables.
+
+## Sprint 4 AI interactions
+
+`ai_interactions` stores provider, model, operation, nullable Subject/Topic/Question references,
+help level, prompt version, input/output character counts, nullable provider token counts,
+latency, request ID, success state, neutral error code, and creation time.
+
+`success IS NULL` is pending, `true` is a completed success, and `false` is a completed provider
+failure. Checks enforce these states and nonnegative metrics. Entity foreign keys are nullable
+with `ON DELETE SET NULL`, so Tutor use neither freezes Questions nor blocks otherwise valid
+academic deletion. Metadata remains after references are cleared.
+
+Prompts, academic text, answer references, generated content, exceptions, headers, API keys, and
+arbitrary provider JSON are not stored. Exact transcript reconstruction is intentionally traded
+for privacy and minimal retention.

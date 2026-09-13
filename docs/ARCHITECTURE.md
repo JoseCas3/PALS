@@ -63,3 +63,14 @@ Secrets come from environment variables.
 
 ## Deferred infrastructure
 Redis, workers, object storage and vector search are added only when a concrete feature requires them.
+
+## Sprint 4 AI flow
+
+Sprint 4 realizes the provider boundary as `TutorService -> AIGateway -> AIProvider ->
+OpenAIProvider`. Only the adapter imports the OpenAI SDK. The model comes from configuration and
+no vendor type crosses the adapter boundary.
+
+TutorService reads Question/Topic/Subject context, commits a pending metadata-only AIInteraction,
+then calls the provider with no database transaction open. A short second transaction finalizes
+success or failure. TutorService has no dependency on Attempt, Mastery, ExamTopic, or planner
+mutation paths.

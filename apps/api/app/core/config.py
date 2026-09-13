@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import Field
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -11,6 +11,10 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+asyncpg://pals:pals@localhost:5432/pals"
     database_connect_timeout_seconds: float = Field(default=3.0, gt=0)
     cors_origins: str = "http://localhost:3000"
+    ai_provider: str = "openai"
+    ai_model: str = "gpt-5-mini"
+    ai_api_key: SecretStr | None = None
+    ai_timeout_seconds: float = Field(default=20.0, gt=0)
 
     @property
     def allowed_origins(self) -> list[str]:
@@ -20,4 +24,3 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
-

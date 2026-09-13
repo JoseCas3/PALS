@@ -9,6 +9,7 @@ import type {
   StudyPlan,
   Subject,
   Topic,
+  TutorResponse,
 } from "./types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -111,5 +112,10 @@ export const api = {
       ...body(value),
     }),
   getMastery: (topicId: string) => request<Mastery>(`/topics/${topicId}/mastery`),
+  getTutorHelp: (questionId: string, helpLevel: number) =>
+    request<TutorResponse>(`/questions/${questionId}/tutor`, {
+      method: "POST",
+      ...body({ help_level: helpLevel }),
+    }),
   getStudyPlan: (examId: string) => request<StudyPlan>(`/exams/${examId}/study-plan`),
 };

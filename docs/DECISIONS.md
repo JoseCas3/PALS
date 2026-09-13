@@ -63,3 +63,23 @@ virtual zero and fully mastered Topics remain included. Past Exams return
 with Mastery need, urgency, then Exam weight as tie precedence. Sorting uses priority descending,
 Mastery ascending, Exam weight descending, and Topic UUID ascending. Because urgency is common
 within an Exam, it affects absolute scores but not within-Exam order. No AI participates.
+
+## ADR-016 Provider-neutral Question Tutor
+
+Accepted. Sprint 4 exposes only question-scoped help levels 1-6. TutorService depends on a neutral
+AIGateway/AIProvider contract; OpenAI Responses is the first adapter, while provider and model
+remain configuration. Responses are plain text, non-streaming, limited to 800 output tokens, and
+use one provider attempt with a 20-second hard timeout and zero retries.
+
+## ADR-017 Metadata-only AI observability
+
+Accepted. Every configured Tutor call commits a pending AIInteraction before network I/O and
+finalizes it afterward in a separate short transaction. Entity references use `ON DELETE SET
+NULL`. No prompt, academic text, answer reference, output transcript, secret, arbitrary metadata,
+or dollar-cost estimate is stored.
+
+## ADR-018 Tutor is not evidence
+
+Accepted. Tutor usage and AIInteraction rows cannot create or modify Attempts, Mastery,
+Questions, ExamTopics, or Study Plans. Tutor levels are not mapped to `hints_used` or
+`solution_seen`. Only the existing Attempt path changes Mastery.

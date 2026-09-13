@@ -48,3 +48,12 @@ Use PALS for one real subject and obtain a useful mastery profile from real prac
 - A past Exam remains valid history but returns a conflict when asked for a current plan.
 - Within one Exam, urgency changes absolute scores but not relative Topic order because all its
   Topics share the same urgency.
+
+## Sprint 4 Tutor surface
+
+Sprint 4 implements question-scoped progressive help only. The six levels range from one
+conceptual hint to a full solution. General Explain, Socratic, Review, Exam, Quick Review, and
+multi-turn conversation modes remain future Alpha work.
+
+Tutor activity is operational usage, not demonstrated learning. It never creates or changes an
+Attempt or Mastery row and is not translated into `hints_used` or `solution_seen`.
