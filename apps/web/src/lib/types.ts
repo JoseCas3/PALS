@@ -124,3 +124,16 @@ export type StudyPlan = {
   generated_at: string;
   items: StudyPlanItem[];
 };
+
+export type GlobalStudyPlanItem = StudyPlanItem & {
+  subject_id: string;
+  subject_name: string;
+  exam_id: string;
+  exam_name: string;
+  exam_date: string;
+};
+
+export type GlobalStudyPlan = {
+  generated_at: string;
+  items: GlobalStudyPlanItem[];
+};

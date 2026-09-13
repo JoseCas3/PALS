@@ -27,7 +27,11 @@ const emptyAttempt = {
   timeSpentSeconds: "0",
 };
 
-export function PracticeManager() {
+type PracticeManagerProps = {
+  onPlannerInputsChanged?: () => void;
+};
+
+export function PracticeManager({ onPlannerInputsChanged }: PracticeManagerProps = {}) {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [subjectId, setSubjectId] = useState("");
   const [topics, setTopics] = useState<Topic[]>([]);
@@ -237,6 +241,7 @@ export function PracticeManager() {
       setMastery(result.mastery);
       setAttempts((items) => [result.attempt, ...items]);
       setAttemptForm(emptyAttempt);
+      onPlannerInputsChanged?.();
     });
     setSubmittingAttempt(false);
   }

@@ -22,6 +22,7 @@ describe("PracticeManager", () => {
   });
 
   it("records evidence, prevents duplicate submission, and uses backend mastery", async () => {
+    const onPlannerInputsChanged = vi.fn();
     let resolveAttempt: ((value: object) => void) | undefined;
     const attemptResponse = new Promise<object>((resolve) => {
       resolveAttempt = resolve;
@@ -41,7 +42,7 @@ describe("PracticeManager", () => {
       return jsonResponse({ error: { message: "Unexpected request" } }, 500);
     });
     vi.stubGlobal("fetch", fetchMock);
-    render(<PracticeManager />);
+    render(<PracticeManager onPlannerInputsChanged={onPlannerInputsChanged} />);
 
     await screen.findByText("Show answer reference");
     expect(screen.getByText("A value approached by a function.")).toBeInTheDocument();
@@ -77,9 +78,11 @@ describe("PracticeManager", () => {
       "http://localhost:8000/api/v1/questions/question-1/attempts",
       expect.objectContaining({ method: "POST" }),
     );
+    expect(onPlannerInputsChanged).toHaveBeenCalledTimes(1);
   });
 
   it("creates a manual question", async () => {
+    const onPlannerInputsChanged = vi.fn();
     const fetchMock = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
       const url = input.toString();
       if (init?.method === "POST" && url.endsWith("/topics/topic-1/questions")) {
@@ -95,7 +98,7 @@ describe("PracticeManager", () => {
       return jsonResponse({ error: { message: "Unexpected request" } }, 500);
     });
     vi.stubGlobal("fetch", fetchMock);
-    render(<PracticeManager />);
+    render(<PracticeManager onPlannerInputsChanged={onPlannerInputsChanged} />);
 
     const promptInput = await screen.findByLabelText("Question prompt");
     fireEvent.change(promptInput, {
@@ -106,9 +109,11 @@ describe("PracticeManager", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Add question" }));
     await screen.findByText("New prompt");
+    expect(onPlannerInputsChanged).not.toHaveBeenCalled();
   });
 
   it("keeps Tutor help separate from Attempt fields and hides the answer by default", async () => {
+    const onPlannerInputsChanged = vi.fn();
     const fetchMock = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
       const url = input.toString();
       if (init?.method === "POST" && url.endsWith("/questions/question-1/tutor")) {
@@ -133,7 +138,7 @@ describe("PracticeManager", () => {
       return jsonResponse({ error: { message: "Unexpected request" } }, 500);
     });
     vi.stubGlobal("fetch", fetchMock);
-    render(<PracticeManager />);
+    render(<PracticeManager onPlannerInputsChanged={onPlannerInputsChanged} />);
 
     const disclosure = await screen.findByText("Show answer reference");
     const details = disclosure.closest("details");
@@ -146,9 +151,11 @@ describe("PracticeManager", () => {
     await screen.findByText("Complete solution");
     expect(screen.getByLabelText("Hints used")).toHaveValue("0");
     expect(screen.getByLabelText("Solution seen")).not.toBeChecked();
+    expect(onPlannerInputsChanged).not.toHaveBeenCalled();
   });
 
   it("generates a safe preview, prevents duplicate requests, and shows duplicate warnings", async () => {
+    const onPlannerInputsChanged = vi.fn();
     let resolveGeneration: ((value: object) => void) | undefined;
     const generationResponse = new Promise<object>((resolve) => {
       resolveGeneration = resolve;
@@ -168,7 +175,7 @@ describe("PracticeManager", () => {
       return jsonResponse({ error: { message: "Unexpected request" } }, 500);
     });
     vi.stubGlobal("fetch", fetchMock);
-    render(<PracticeManager />);
+    render(<PracticeManager onPlannerInputsChanged={onPlannerInputsChanged} />);
 
     const generate = await screen.findByRole("button", { name: "Generate" });
     expect(screen.getByLabelText("Generation count")).toHaveValue("5");
@@ -201,6 +208,7 @@ describe("PracticeManager", () => {
     expect(screen.getByLabelText("Hints used")).toHaveValue("0");
     expect(screen.queryByText(/provider selector/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/chat/i)).not.toBeInTheDocument();
+    expect(onPlannerInputsChanged).not.toHaveBeenCalled();
   });
 
   it("copies one candidate into the editable existing Question form and saves normally", async () => {

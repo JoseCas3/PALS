@@ -119,6 +119,44 @@ def build_reason(*, mastery_need: Decimal, urgency: Decimal, exam_weight: Decima
 
 
 @dataclass(frozen=True)
+class PlannerScore:
+    mastery_score: Decimal
+    mastery_need: Decimal
+    urgency: Decimal
+    exam_weight: Decimal
+    persisted_exam_weight: Decimal
+    priority: Decimal
+    reason: PlannerReason
+
+
+def score_study_plan_item(
+    *,
+    mastery_score: Decimal,
+    exam_date: datetime,
+    exam_weight: Decimal,
+    generated_at: datetime,
+) -> PlannerScore:
+    mastery_need = calculate_mastery_need(mastery_score)
+    urgency = calculate_urgency(exam_date=exam_date, generated_at=generated_at)
+    normalized_exam_weight = _quantize_unit(exam_weight)
+    return PlannerScore(
+        mastery_score=mastery_score,
+        mastery_need=mastery_need,
+        urgency=urgency,
+        exam_weight=normalized_exam_weight,
+        persisted_exam_weight=exam_weight,
+        priority=calculate_priority(
+            mastery_need=mastery_need,
+            urgency=urgency,
+            exam_weight=exam_weight,
+        ),
+        reason=build_reason(
+            mastery_need=mastery_need,
+            urgency=urgency,
+            exam_weight=normalized_exam_weight,
+        ),
+    )
+@dataclass(frozen=True)
 class StudyPlanItem:
     topic_id: uuid.UUID
     topic_name: str
@@ -140,6 +178,30 @@ class StudyPlan:
     items: tuple[StudyPlanItem, ...]
 
 
+@dataclass(frozen=True)
+class GlobalStudyPlanItem:
+    subject_id: uuid.UUID
+    subject_name: str
+    exam_id: uuid.UUID
+    exam_name: str
+    exam_date: datetime
+    topic_id: uuid.UUID
+    topic_name: str
+    mastery_score: Decimal
+    mastery_need: Decimal
+    urgency: Decimal
+    exam_weight: Decimal
+    persisted_exam_weight: Decimal
+    priority: Decimal
+    reason: PlannerReason
+
+
+@dataclass(frozen=True)
+class GlobalStudyPlan:
+    generated_at: datetime
+    items: tuple[GlobalStudyPlanItem, ...]
+
+
 def sort_study_plan_items(items: list[StudyPlanItem]) -> list[StudyPlanItem]:
     return sorted(
         items,
@@ -147,6 +209,22 @@ def sort_study_plan_items(items: list[StudyPlanItem]) -> list[StudyPlanItem]:
             -item.priority,
             item.mastery_score,
             -item.persisted_exam_weight,
+            item.topic_id,
+        ),
+    )
+
+
+def sort_global_study_plan_items(
+    items: list[GlobalStudyPlanItem],
+) -> list[GlobalStudyPlanItem]:
+    return sorted(
+        items,
+        key=lambda item: (
+            -item.priority,
+            item.mastery_score,
+            item.exam_date,
+            -item.persisted_exam_weight,
+            item.exam_id,
             item.topic_id,
         ),
     )
@@ -171,31 +249,19 @@ class PlannerService:
                 "Study plans cannot be generated for a past exam",
             )
 
-        urgency = calculate_urgency(exam_date=exam_utc, generated_at=generated_utc)
         items: list[StudyPlanItem] = []
         for topic in await self.planner.list_topic_inputs(exam_id):
-            mastery_need = calculate_mastery_need(topic.mastery_score)
-            priority = calculate_priority(
-                mastery_need=mastery_need,
-                urgency=urgency,
+            score = score_study_plan_item(
+                mastery_score=topic.mastery_score,
+                exam_date=exam_utc,
                 exam_weight=topic.exam_weight,
+                generated_at=generated_utc,
             )
-            normalized_exam_weight = _quantize_unit(topic.exam_weight)
             items.append(
                 StudyPlanItem(
                     topic_id=topic.topic_id,
                     topic_name=topic.topic_name,
-                    mastery_score=topic.mastery_score,
-                    mastery_need=mastery_need,
-                    urgency=urgency,
-                    exam_weight=normalized_exam_weight,
-                    persisted_exam_weight=topic.exam_weight,
-                    priority=priority,
-                    reason=build_reason(
-                        mastery_need=mastery_need,
-                        urgency=urgency,
-                        exam_weight=normalized_exam_weight,
-                    ),
+                    **score.__dict__,
                 )
             )
 
@@ -206,4 +272,36 @@ class PlannerService:
             exam_date=exam_utc,
             generated_at=generated_utc,
             items=tuple(ordered),
+        )
+
+    async def generate_global(self, generated_at: datetime) -> GlobalStudyPlan:
+        generated_utc = _as_utc(generated_at, "generated_at")
+        items: list[GlobalStudyPlanItem] = []
+        for planner_input in await self.planner.list_global_inputs(generated_utc):
+            exam_utc = _as_utc(planner_input.exam_date, "exam_date")
+            score = score_study_plan_item(
+                mastery_score=(
+                    planner_input.mastery_score
+                    if planner_input.mastery_score is not None
+                    else Decimal("0.00")
+                ),
+                exam_date=exam_utc,
+                exam_weight=planner_input.exam_weight,
+                generated_at=generated_utc,
+            )
+            items.append(
+                GlobalStudyPlanItem(
+                    subject_id=planner_input.subject_id,
+                    subject_name=planner_input.subject_name,
+                    exam_id=planner_input.exam_id,
+                    exam_name=planner_input.exam_name,
+                    exam_date=exam_utc,
+                    topic_id=planner_input.topic_id,
+                    topic_name=planner_input.topic_name,
+                    **score.__dict__,
+                )
+            )
+        return GlobalStudyPlan(
+            generated_at=generated_utc,
+            items=tuple(sort_global_study_plan_items(items)),
         )

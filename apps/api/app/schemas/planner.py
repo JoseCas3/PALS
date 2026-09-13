@@ -56,3 +56,36 @@ class StudyPlanResponse(BaseModel):
     exam_date: datetime
     generated_at: datetime
     items: list[StudyPlanItemResponse]
+
+
+class GlobalStudyPlanItemResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    subject_id: uuid.UUID
+    subject_name: str
+    exam_id: uuid.UUID
+    exam_name: str
+    exam_date: datetime
+    topic_id: uuid.UUID
+    topic_name: str
+    mastery_score: Decimal
+    mastery_need: Decimal
+    urgency: Decimal
+    exam_weight: Decimal
+    priority: Decimal
+    reason: PlannerReasonResponse
+
+    @field_serializer("mastery_score")
+    def serialize_mastery_score(self, value: Decimal) -> str:
+        return format(value, ".2f")
+
+    @field_serializer("mastery_need", "urgency", "exam_weight", "priority")
+    def serialize_unit_decimal(self, value: Decimal) -> str:
+        return format(value, ".4f")
+
+
+class GlobalStudyPlanResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    generated_at: datetime
+    items: list[GlobalStudyPlanItemResponse]

@@ -89,6 +89,13 @@ button:disabled { cursor: wait; opacity: .6; }
 .plan-metrics dd, .factor-list dd { margin: .2rem 0 0; font-variant-numeric: tabular-nums; }
 .plan-summary { margin: .7rem 0; }
 .plan-content summary { color: var(--accent); cursor: pointer; font-weight: 700; }
+.global-plan-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+.refresh-plan { border: 1px solid var(--border); border-radius: .8rem; background: white; padding: .7rem 1rem; color: var(--accent); font-weight: 700; }
+.global-plan-section-title { margin: 0 0 .75rem; }
+.global-recommendation { border: 2px solid var(--accent); border-radius: 1.2rem; background: rgba(38,115,77,.08); padding: 1.2rem; }
+.plan-context { margin: 0 0 .2rem; color: var(--accent); font-size: .75rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.plan-exam { margin: .45rem 0 0; color: var(--muted); }
+.global-plan-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
 @media (max-width: 760px) {
   .domain-grid, .practice-grid, .practice-selectors { grid-template-columns: 1fr; }
@@ -96,4 +103,5 @@ button:disabled { cursor: wait; opacity: .6; }
   .planner-result-heading, .plan-title { align-items: flex-start; flex-direction: column; }
   .plan-metrics, .factor-list, .help-levels { grid-template-columns: 1fr; }
   .tutor-heading { align-items: flex-start; flex-direction: column; }
+  .global-plan-heading { flex-direction: column; }
 }

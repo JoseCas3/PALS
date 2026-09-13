@@ -43,6 +43,7 @@ describe("DomainManager", () => {
   });
 
   it("assigns a weighted topic to an exam", async () => {
+    const onPlannerInputsChanged = vi.fn();
     const subject = entity("subject-1", "Calculus");
     const topic = { ...entity("topic-1", "Limits"), subject_id: subject.id };
     const exam = {
@@ -62,7 +63,7 @@ describe("DomainManager", () => {
       return jsonResponse({ error: { message: "Unexpected request" } }, 500);
     });
     vi.stubGlobal("fetch", fetchMock);
-    render(<DomainManager />);
+    render(<DomainManager onPlannerInputsChanged={onPlannerInputsChanged} />);
 
     await screen.findByRole("heading", { name: "Weighted topics" });
     fireEvent.change(screen.getByLabelText("Topic to assign"), {
@@ -76,6 +77,7 @@ describe("DomainManager", () => {
       "http://localhost:8000/api/v1/exams/exam-1/topics/topic-1",
       expect.objectContaining({ method: "PUT" }),
     );
+    expect(onPlannerInputsChanged).toHaveBeenCalledTimes(1);
   });
 });
 

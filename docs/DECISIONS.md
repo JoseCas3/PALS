@@ -106,3 +106,18 @@ matches against existing Questions produce an advisory warning. Semantic detecti
 Accepted. “Use candidate” copies one proposal into the ordinary editable Question form. The user
 submits the existing one-Question POST, preserving Question validation and transaction semantics.
 There is no bulk approval, candidate persistence, or Question provenance.
+
+## ADR-023 Deterministic global on-demand planning
+
+Accepted. The Global Study Plan reuses the Sprint 3 formula and shared exact Decimal scoring for
+every ExamTopic whose Exam date is at or after one captured UTC instant. Past Exams are silently
+excluded globally while the Exam-specific historical conflict remains unchanged. One joined query
+loads Subject, Exam, ExamTopic, Topic, and optional Mastery inputs; sorting is authoritative in the
+service and resolves ties by priority descending, Mastery ascending, Exam date ascending, exact
+weight descending, Exam UUID, then Topic UUID.
+
+Each ExamTopic remains a separate obligation, including when one Topic belongs to multiple Exams.
+The complete queue is returned, with its first item serving as the recommendation. Plans are never
+persisted or cached, and neither AI nor Questions participate. Exam importance and cross-Exam weight
+normalization are deferred because Alpha has no supporting domain data and should require no extra
+configuration.

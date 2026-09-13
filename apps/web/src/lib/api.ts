@@ -8,6 +8,7 @@ import type {
   QuestionDifficulty,
   QuestionGenerationResponse,
   GenerationDifficulty,
+  GlobalStudyPlan,
   StudyPlan,
   Subject,
   Topic,
@@ -128,4 +129,5 @@ export const api = {
       ...body({ help_level: helpLevel }),
     }),
   getStudyPlan: (examId: string) => request<StudyPlan>(`/exams/${examId}/study-plan`),
+  getGlobalStudyPlan: () => request<GlobalStudyPlan>("/study-plan"),
 };

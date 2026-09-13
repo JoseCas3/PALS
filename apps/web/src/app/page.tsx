@@ -1,7 +1,5 @@
 import { ApiHealthStatus } from "@/components/api-health-status";
-import { DomainManager } from "@/components/domain-manager";
-import { PracticeManager } from "@/components/practice-manager";
-import { StudyPlanner } from "@/components/study-planner";
+import { LearningWorkspace } from "@/components/learning-workspace";
 
 export default function Home() {
   return (
@@ -15,9 +13,7 @@ export default function Home() {
           <ApiHealthStatus />
         </div>
       </header>
-      <DomainManager />
-      <div className="mt-6"><PracticeManager /></div>
-      <div className="mt-6"><StudyPlanner /></div>
+      <LearningWorkspace />
     </main>
   );
 }

@@ -8,7 +8,11 @@ import type { Exam, ExamTopic, Subject, Topic } from "../lib/types";
 type FormState = { name: string; description: string };
 const emptyForm: FormState = { name: "", description: "" };
 
-export function DomainManager() {
+type DomainManagerProps = {
+  onPlannerInputsChanged?: () => void;
+};
+
+export function DomainManager({ onPlannerInputsChanged }: DomainManagerProps = {}) {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [selectedSubjectId, setSelectedSubjectId] = useState("");
   const [topics, setTopics] = useState<Topic[]>([]);
@@ -97,6 +101,7 @@ export function DomainManager() {
       setExams((items) => [...items, created]);
       setSelectedExamId(created.id);
       setExamForm({ ...emptyForm, examDate: "" });
+      onPlannerInputsChanged?.();
     });
   }
 
@@ -109,6 +114,7 @@ export function DomainManager() {
         Number(assignment.weight),
       );
       setAssignments((items) => [...items.filter((item) => item.topic_id !== saved.topic_id), saved]);
+      onPlannerInputsChanged?.();
     });
   }
 
@@ -126,6 +132,7 @@ export function DomainManager() {
         const saved = await api.updateExam(id, { name });
         setExams((items) => replace(items, saved));
       }
+      onPlannerInputsChanged?.();
     });
   }
 
@@ -143,6 +150,7 @@ export function DomainManager() {
         await api.deleteExam(id);
         setExams((items) => items.filter((item) => item.id !== id));
         if (selectedExamId === id) setSelectedExamId("");
+        onPlannerInputsChanged?.();
       }
     });
   }
@@ -151,6 +159,7 @@ export function DomainManager() {
     await act(async () => {
       await api.deleteExamTopic(selectedExamId, topicId);
       setAssignments((items) => items.filter((item) => item.topic_id !== topicId));
+      onPlannerInputsChanged?.();
     });
   }
 

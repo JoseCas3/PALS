@@ -67,3 +67,15 @@ operation. Generation never creates Attempts, changes Mastery, or affects the de
 
 Generation is based only on Subject/Topic metadata and model knowledge. It is not grounded in course
 documents, and generated answer references may be inaccurate; human review is required.
+
+## Sprint 6 global planning rules
+
+- The Global Study Plan answers "What should I study now?" across all active Exams.
+- An Exam is active when its date is at or after the request's single captured UTC instant; past
+  Exams are silently excluded from the global queue.
+- Each active ExamTopic is a separate obligation. A Topic assigned to two Exams appears twice with
+  its distinct Exam context, urgency, weight, and priority.
+- Global priority reuses the Sprint 3 formula exactly. There is no Exam importance or cross-Exam
+  normalization in Alpha.
+- The complete queue is returned in deterministic order, and its first item is the recommendation.
+- Global planning is calculated on demand, read-only, unpersisted, and uses no AI.

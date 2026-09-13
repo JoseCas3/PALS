@@ -168,3 +168,11 @@ Generation uses Subject and Topic metadata plus model knowledge; it is not groun
 course material. Candidate prompts and answers are not retained by PALS. Generation never creates
 Attempts or changes Mastery, ExamTopic data, or Study Plans. Without `AI_API_KEY`, both Tutor and
 Question Generation return a safe 503 while non-AI features continue working.
+
+## Sprint 6 global adaptive planner
+
+Sprint 6 adds `GET /api/v1/study-plan`, a deterministic, read-only queue across every active
+Exam and its assigned Topics. It reuses the Sprint 3 Decimal formula without cross-Exam
+normalization: past Exams are excluded, an Exam exactly at the captured time is included, and the
+same Topic appears once per ExamTopic obligation. The first server-ranked item is the current
+recommendation. Plans remain calculated on demand, uncached, unpersisted, and independent of AI.

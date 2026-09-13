@@ -86,3 +86,17 @@ output-character limit. The OpenAI adapter maps that description to strict Respo
 output, while the service parses the returned JSON and applies authoritative Pydantic and domain
 validation. Candidates are returned to the browser and are not persisted. Approval continues through
 `QuestionService`; generation has no dependency on evidence or planner mutation paths.
+
+## Sprint 6 global planning flow
+
+Sprint 6 extends the existing planner service rather than creating a parallel planning subsystem.
+The Exam-specific and Global planners share one pure scoring operation over Mastery, Exam date,
+ExamTopic weight, and the captured UTC instant, preventing formula and precision drift.
+
+The Global route captures time once. One repository query joins active Exam, Subject, ExamTopic,
+Topic, and optional Mastery rows. The service maps absent Mastery to virtual zero, scores each
+ExamTopic independently, and applies the authoritative cross-Exam ordering in memory. Database
+return order is irrelevant and no per-Exam or per-Topic query is issued.
+
+Global planning contains no write, lock, commit, AI, Question, Attempt, or AIInteraction path. The
+queue is returned on demand with `Cache-Control: no-store`; no plan or recommendation is stored.

@@ -94,6 +94,27 @@ mastered Topic remains included. An Exam without Topics returns an empty `items`
 return 409 `EXAM_ALREADY_PASSED`. Responses include `Cache-Control: no-store`. Planning performs
 no writes and uses no AI.
 
+## Global Study Plan
+
+- `GET /study-plan` -> 200
+
+The endpoint accepts no parameters or body. Its envelope contains one captured UTC `generated_at`
+and the complete globally ordered `items` array. Each item contains Subject, Exam, and Topic IDs
+and names, Exam date, Mastery, normalized planner components, priority, and the existing
+deterministic reason. Mastery is a fixed two-place string and planner decimals are fixed four-place
+strings. `items[0]` is the primary recommendation; there is no separate recommendation field.
+
+An Exam is active when `exam_date >= generated_at`. Past Exams are silently excluded, exact-time
+Exams are included with urgency `1.0000`, active Exams without assigned Topics contribute nothing,
+and fully mastered Topics remain eligible. The same Topic assigned to multiple Exams produces one
+item per ExamTopic.
+
+Global ordering is priority descending, Mastery ascending, Exam date ascending, exact persisted
+ExamTopic weight descending, Exam UUID ascending, then Topic UUID ascending. The server is the sole
+ranking authority. Empty academic or active-workload states return 200 with an empty `items` array.
+Responses include `Cache-Control: no-store`. The projection performs one SELECT, no writes, and no
+AI calls.
+
 ## Question Generation
 
 - `POST /topics/{topic_id}/question-generation` -> 200
