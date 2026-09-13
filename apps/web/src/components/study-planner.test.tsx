@@ -64,6 +64,20 @@ describe("StudyPlanner", () => {
       .toBeInTheDocument();
   });
 
+  it("ignores a delayed plan after the Exam changes", async () => {
+    let resolvePlan: ((value: object) => void) | undefined;
+    const pendingPlan = new Promise<object>((resolve) => { resolvePlan = resolve; });
+    vi.stubGlobal("fetch", standardFetch(planResponse(), pendingPlan, [firstExam, secondExam]));
+    render(<StudyPlanner />);
+
+    fireEvent.click(await enabledGenerateButton());
+    fireEvent.change(screen.getByLabelText("Planner exam"), { target: { value: secondExam.id } });
+    resolvePlan?.(jsonResponse(planResponse()));
+
+    await waitFor(() => expect(screen.queryByText("First from server")).not.toBeInTheDocument());
+    expect(screen.getByLabelText("Planner exam")).toHaveValue(secondExam.id);
+  });
+
   it("renders an empty plan", async () => {
     vi.stubGlobal("fetch", standardFetch({ ...planResponse(), items: [] }));
     render(<StudyPlanner />);

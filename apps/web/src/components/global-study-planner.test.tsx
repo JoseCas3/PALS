@@ -41,6 +41,7 @@ describe("GlobalStudyPlanner", () => {
     );
     render(<GlobalStudyPlanner refreshRevision={0} />);
     expect(await screen.findAllByText(/First from server|Same topic/)).toHaveLength(2);
+    expect(screen.getAllByRole("button", { name: "Practice this topic" })).toHaveLength(2);
     expect(screen.getByText("Midterm", { exact: false })).toBeInTheDocument();
     expect(screen.getByText("Final", { exact: false })).toBeInTheDocument();
 
@@ -50,7 +51,35 @@ describe("GlobalStudyPlanner", () => {
       vi.fn().mockResolvedValue(jsonResponse({ ...planResponse(), items: [] })),
     );
     render(<GlobalStudyPlanner refreshRevision={0} />);
-    expect(await screen.findByText("No active Exam Topics to study right now.")).toBeInTheDocument();
+    expect(await screen.findByText(/No active assigned Topics yet/)).toBeInTheDocument();
+  });
+
+  it("sends the correct Subject and Topic for primary, up-next, and repeated Topic actions", async () => {
+    const onPracticeTopicRequested = vi.fn();
+    const duplicate = {
+      ...planItem("exam-2", "topic-1", "Same topic", "Final", "0.3000"),
+      subject_id: "subject-2",
+      subject_name: "Physics",
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        jsonResponse({ ...planResponse(), items: [planResponse().items[0], duplicate] }),
+      ),
+    );
+    render(
+      <GlobalStudyPlanner
+        refreshRevision={0}
+        onPracticeTopicRequested={onPracticeTopicRequested}
+      />,
+    );
+
+    const actions = await screen.findAllByRole("button", { name: "Practice this topic" });
+    fireEvent.click(actions[0]);
+    fireEvent.click(actions[1]);
+
+    expect(onPracticeTopicRequested).toHaveBeenNthCalledWith(1, "subject-1", "topic-1");
+    expect(onPracticeTopicRequested).toHaveBeenNthCalledWith(2, "subject-2", "topic-1");
   });
 
   it("shows errors, retries, manually refreshes, and blocks duplicate manual refresh", async () => {

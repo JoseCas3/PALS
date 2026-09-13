@@ -7,9 +7,13 @@ import type { GlobalStudyPlan, GlobalStudyPlanItem } from "../lib/types";
 
 type GlobalStudyPlannerProps = {
   refreshRevision: number;
+  onPracticeTopicRequested?: (subjectId: string, topicId: string) => void;
 };
 
-export function GlobalStudyPlanner({ refreshRevision }: GlobalStudyPlannerProps) {
+export function GlobalStudyPlanner({
+  refreshRevision,
+  onPracticeTopicRequested,
+}: GlobalStudyPlannerProps) {
   const [plan, setPlan] = useState<GlobalStudyPlan | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -73,13 +77,19 @@ export function GlobalStudyPlanner({ refreshRevision }: GlobalStudyPlannerProps)
       {loading && !plan && <p className="empty">Loading your active study workload…</p>}
 
       {!loading && !error && plan?.items.length === 0 && (
-        <p className="empty">No active Exam Topics to study right now.</p>
+        <p className="empty">
+          No active assigned Topics yet. Create a future Exam and assign Topics in Academic setup.
+        </p>
       )}
 
       {recommendation && (
         <div aria-label="Study this now">
           <h3 className="global-plan-section-title">Study this now</h3>
-          <PlanItem item={recommendation} emphasized />
+          <PlanItem
+            item={recommendation}
+            emphasized
+            onPracticeTopicRequested={onPracticeTopicRequested}
+          />
         </div>
       )}
 
@@ -90,7 +100,10 @@ export function GlobalStudyPlanner({ refreshRevision }: GlobalStudyPlannerProps)
             {upcoming.map((item, index) => (
               <li key={`${item.exam_id}:${item.topic_id}`}>
                 <div className="plan-rank" aria-label={`Rank ${index + 2}`}>{index + 2}</div>
-                <PlanItemContent item={item} />
+                <PlanItemContent
+                  item={item}
+                  onPracticeTopicRequested={onPracticeTopicRequested}
+                />
               </li>
             ))}
           </ol>
@@ -100,15 +113,32 @@ export function GlobalStudyPlanner({ refreshRevision }: GlobalStudyPlannerProps)
   );
 }
 
-function PlanItem({ item, emphasized }: { item: GlobalStudyPlanItem; emphasized: boolean }) {
+function PlanItem({
+  item,
+  emphasized,
+  onPracticeTopicRequested,
+}: {
+  item: GlobalStudyPlanItem;
+  emphasized: boolean;
+  onPracticeTopicRequested?: (subjectId: string, topicId: string) => void;
+}) {
   return (
     <article className={emphasized ? "global-recommendation" : undefined}>
-      <PlanItemContent item={item} />
+      <PlanItemContent
+        item={item}
+        onPracticeTopicRequested={onPracticeTopicRequested}
+      />
     </article>
   );
 }
 
-function PlanItemContent({ item }: { item: GlobalStudyPlanItem }) {
+function PlanItemContent({
+  item,
+  onPracticeTopicRequested,
+}: {
+  item: GlobalStudyPlanItem;
+  onPracticeTopicRequested?: (subjectId: string, topicId: string) => void;
+}) {
   return (
     <div className="plan-content">
       <div className="plan-title">
@@ -126,6 +156,13 @@ function PlanItemContent({ item }: { item: GlobalStudyPlanItem }) {
         <div><dt>Priority</dt><dd>{item.priority}</dd></div>
       </dl>
       <p className="plan-summary">{item.reason.summary}</p>
+      <button
+        type="button"
+        className="practice-topic-action"
+        onClick={() => onPracticeTopicRequested?.(item.subject_id, item.topic_id)}
+      >
+        Practice this topic
+      </button>
     </div>
   );
 }

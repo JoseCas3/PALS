@@ -1,4 +1,5 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { PracticeManager } from "./practice-manager";
@@ -42,7 +43,7 @@ describe("PracticeManager", () => {
       return jsonResponse({ error: { message: "Unexpected request" } }, 500);
     });
     vi.stubGlobal("fetch", fetchMock);
-    render(<PracticeManager onPlannerInputsChanged={onPlannerInputsChanged} />);
+    renderPractice({ onAttemptRecorded: onPlannerInputsChanged });
 
     await screen.findByText("Show answer reference");
     expect(screen.getByText("A value approached by a function.")).toBeInTheDocument();
@@ -81,6 +82,34 @@ describe("PracticeManager", () => {
     expect(onPlannerInputsChanged).toHaveBeenCalledTimes(1);
   });
 
+  it("does not refresh the planner or change Mastery when an Attempt fails", async () => {
+    const onAttemptRecorded = vi.fn();
+    const fetchMock = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      const url = input.toString();
+      if (init?.method === "POST" && url.endsWith("/questions/question-1/attempts")) {
+        return jsonResponse({ error: { message: "Attempt rejected" } }, 409);
+      }
+      if (url.endsWith("/subjects")) return jsonResponse([subject]);
+      if (url.endsWith("/subjects/subject-1/topics")) return jsonResponse([topic]);
+      if (url.endsWith("/topics/topic-1/questions")) return jsonResponse([question]);
+      if (url.endsWith("/topics/topic-1/mastery")) {
+        return jsonResponse({ topic_id: topic.id, score: "40.00", updated_at: "2026-09-11T00:00:00Z" });
+      }
+      if (url.endsWith("/questions/question-1/attempts")) return jsonResponse([]);
+      return jsonResponse({ error: { message: "Unexpected request" } }, 500);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    renderPractice({ onAttemptRecorded });
+
+    await screen.findByText("Show answer reference");
+    fireEvent.click(screen.getByRole("button", { name: "Record attempt" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Attempt rejected");
+    expect(screen.getByLabelText("Current mastery")).toHaveTextContent("40.00");
+    expect(onAttemptRecorded).not.toHaveBeenCalled();
+    expect(screen.queryByText(/Attempt recorded/)).not.toBeInTheDocument();
+  });
+
   it("creates a manual question", async () => {
     const onPlannerInputsChanged = vi.fn();
     const fetchMock = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
@@ -98,7 +127,7 @@ describe("PracticeManager", () => {
       return jsonResponse({ error: { message: "Unexpected request" } }, 500);
     });
     vi.stubGlobal("fetch", fetchMock);
-    render(<PracticeManager onPlannerInputsChanged={onPlannerInputsChanged} />);
+    renderPractice({ onAttemptRecorded: onPlannerInputsChanged });
 
     const promptInput = await screen.findByLabelText("Question prompt");
     fireEvent.change(promptInput, {
@@ -138,7 +167,7 @@ describe("PracticeManager", () => {
       return jsonResponse({ error: { message: "Unexpected request" } }, 500);
     });
     vi.stubGlobal("fetch", fetchMock);
-    render(<PracticeManager onPlannerInputsChanged={onPlannerInputsChanged} />);
+    renderPractice({ onAttemptRecorded: onPlannerInputsChanged });
 
     const disclosure = await screen.findByText("Show answer reference");
     const details = disclosure.closest("details");
@@ -175,7 +204,7 @@ describe("PracticeManager", () => {
       return jsonResponse({ error: { message: "Unexpected request" } }, 500);
     });
     vi.stubGlobal("fetch", fetchMock);
-    render(<PracticeManager onPlannerInputsChanged={onPlannerInputsChanged} />);
+    renderPractice({ onAttemptRecorded: onPlannerInputsChanged });
 
     const generate = await screen.findByRole("button", { name: "Generate" });
     expect(screen.getByLabelText("Generation count")).toHaveValue("5");
@@ -231,7 +260,7 @@ describe("PracticeManager", () => {
       return jsonResponse({ error: { message: "Unexpected request" } }, 500);
     });
     vi.stubGlobal("fetch", fetchMock);
-    render(<PracticeManager />);
+    renderPractice();
 
     fireEvent.click(await screen.findByRole("button", { name: "Generate" }));
     fireEvent.click(await screen.findByRole("button", { name: "Use candidate" }));
@@ -279,7 +308,7 @@ describe("PracticeManager", () => {
       return jsonResponse({ error: { message: "Unexpected request" } }, 500);
     });
     vi.stubGlobal("fetch", fetchMock);
-    render(<PracticeManager />);
+    renderPractice();
 
     fireEvent.click(await screen.findByRole("button", { name: "Generate" }));
     await screen.findByText("AI unavailable");
@@ -292,6 +321,294 @@ describe("PracticeManager", () => {
       expect(screen.queryByRole("button", { name: "Use candidate" })).not.toBeInTheDocument(),
     );
     expect(screen.queryByText("AI unavailable")).not.toBeInTheDocument();
+  });
+
+  it("clears all old Topic context when an external Topic selection arrives", async () => {
+    const secondTopic = { ...topic, id: "topic-2", name: "Integrals" };
+    const oldAttempt = {
+      id: "attempt-1",
+      question_id: question.id,
+      correct: true,
+      hints_used: 1,
+      solution_seen: false,
+      time_spent_seconds: 12,
+      created_at: "2026-09-12T00:00:00Z",
+    };
+    const fetchMock = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      const url = input.toString();
+      if (init?.method === "POST" && url.endsWith("/question-generation")) {
+        return jsonResponse(generationResult());
+      }
+      if (init?.method === "POST" && url.endsWith("/questions/question-1/tutor")) {
+        return jsonResponse({
+          interaction_id: "interaction-1",
+          question_id: question.id,
+          help_level: 1,
+          content: "Old tutor guidance",
+          provider: "fake",
+          model: "fake-model",
+          prompt_version: "question_tutor.v1",
+          created_at: "2026-09-12T00:00:00Z",
+        });
+      }
+      if (url.endsWith("/subjects")) return jsonResponse([subject]);
+      if (url.endsWith("/subjects/subject-1/topics")) return jsonResponse([topic, secondTopic]);
+      if (url.endsWith("/topics/topic-1/questions")) return jsonResponse([question]);
+      if (url.endsWith("/topics/topic-2/questions")) return jsonResponse([]);
+      if (url.endsWith("/topics/topic-1/mastery")) {
+        return jsonResponse({ topic_id: topic.id, score: "45.00", updated_at: "2026-09-12T00:00:00Z" });
+      }
+      if (url.endsWith("/topics/topic-2/mastery")) {
+        return jsonResponse({ topic_id: secondTopic.id, score: "0.00", updated_at: null });
+      }
+      if (url.endsWith("/questions/question-1/attempts")) return jsonResponse([oldAttempt]);
+      return jsonResponse({ error: { message: "Unexpected request" } }, 500);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    renderPractice();
+
+    await screen.findByText(/1 hints.*solution hidden.*12s/);
+    fireEvent.change(screen.getByLabelText("Question prompt"), { target: { value: "Old draft" } });
+    fireEvent.change(screen.getByLabelText("Time spent seconds"), { target: { value: "99" } });
+    fireEvent.click(screen.getByRole("button", { name: "Generate" }));
+    await screen.findByRole("button", { name: "Use candidate" });
+    fireEvent.click(screen.getByRole("button", { name: "Get help" }));
+    await screen.findByText("Old tutor guidance");
+
+    fireEvent.change(screen.getByLabelText("Practice topic"), { target: { value: secondTopic.id } });
+
+    await screen.findByText("Calculus / Integrals");
+    await screen.findByText("Create a Question manually, or generate an optional AI preview.");
+    expect(screen.getByLabelText("Question prompt")).toHaveValue("");
+    expect(screen.getByLabelText("Current mastery")).toHaveTextContent("0.00");
+    expect(screen.queryByText("What is a limit?")).not.toBeInTheDocument();
+    expect(screen.queryByText("Old tutor guidance")).not.toBeInTheDocument();
+    expect(screen.queryByText(/1 hints.*solution hidden.*12s/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Use candidate" })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Time spent seconds")).not.toBeInTheDocument();
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
+  it("refreshes selectable academic data after a successful same-page mutation", async () => {
+    const secondTopic = { ...topic, id: "topic-2", name: "Integrals" };
+    let topicLoads = 0;
+    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+      const url = input.toString();
+      if (url.endsWith("/subjects")) return jsonResponse([subject]);
+      if (url.endsWith("/subjects/subject-1/topics")) {
+        topicLoads += 1;
+        return jsonResponse(topicLoads === 1 ? [topic] : [topic, secondTopic]);
+      }
+      return jsonResponse({ error: { message: "Unexpected request" } }, 500);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    function RevisionHarness() {
+      const [academicRevision, setAcademicRevision] = useState(0);
+      return <>
+        <button type="button" onClick={() => setAcademicRevision((value) => value + 1)}>
+          Publish academic revision
+        </button>
+        <PracticeManager
+          selectedSubjectId={subject.id}
+          selectedTopicId=""
+          academicRevision={academicRevision}
+          onSubjectSelected={vi.fn()}
+          onTopicSelected={vi.fn()}
+        />
+      </>;
+    }
+
+    render(<RevisionHarness />);
+    await waitFor(() => expect(screen.getByLabelText("Practice topic")).toBeEnabled());
+    expect(screen.queryByRole("option", { name: "Integrals" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Publish academic revision" }));
+    expect(await screen.findByRole("option", { name: "Integrals" })).toBeInTheDocument();
+    expect(topicLoads).toBe(2);
+  });
+
+  it.each(["success", "failure"] as const)(
+    "ignores stale Question and Mastery read %s after a Topic change",
+    async (outcome) => {
+    const secondTopic = { ...topic, id: "topic-2", name: "Integrals" };
+    const secondQuestion = { ...question, id: "question-2", topic_id: secondTopic.id, prompt: "Integrate x" };
+    let resolveOldQuestions: ((value: object) => void) | undefined;
+    const oldQuestions = new Promise<object>((resolve) => { resolveOldQuestions = resolve; });
+    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+      const url = input.toString();
+      if (url.endsWith("/subjects")) return jsonResponse([subject]);
+      if (url.endsWith("/subjects/subject-1/topics")) return jsonResponse([topic, secondTopic]);
+      if (url.endsWith("/topics/topic-1/questions")) return oldQuestions;
+      if (url.endsWith("/topics/topic-1/mastery")) return jsonResponse({ topic_id: topic.id, score: "10.00", updated_at: null });
+      if (url.endsWith("/topics/topic-2/questions")) return jsonResponse([secondQuestion]);
+      if (url.endsWith("/topics/topic-2/mastery")) return jsonResponse({ topic_id: secondTopic.id, score: "60.00", updated_at: "2026-09-12T00:00:00Z" });
+      if (url.endsWith("/questions/question-2/attempts")) return jsonResponse([]);
+      return jsonResponse({ error: { message: "Unexpected request" } }, 500);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    renderPractice();
+
+    await waitFor(() => expect(screen.getByLabelText("Practice topic")).toBeEnabled());
+    fireEvent.change(screen.getByLabelText("Practice topic"), { target: { value: secondTopic.id } });
+    expect(await screen.findAllByText("Integrate x")).toHaveLength(2);
+    expect(screen.getByLabelText("Current mastery")).toHaveTextContent("60.00");
+
+    resolveOldQuestions?.(outcome === "success"
+      ? jsonResponse([question])
+      : jsonResponse({ error: { message: "Stale failure" } }, 500));
+    await waitFor(() => expect(screen.queryByText("Stale failure")).not.toBeInTheDocument());
+    expect(screen.queryByText("What is a limit?")).not.toBeInTheDocument();
+    expect(screen.getAllByText("Integrate x")).toHaveLength(2);
+    },
+  );
+
+  it.each(["success", "failure"] as const)(
+    "ignores a stale Attempt read %s after a Topic change",
+    async (outcome) => {
+      const secondTopic = { ...topic, id: "topic-2", name: "Integrals" };
+      const secondQuestion = { ...question, id: "question-2", topic_id: secondTopic.id, prompt: "Integrate x" };
+      let resolveOldAttempts: ((value: object) => void) | undefined;
+      const oldAttempts = new Promise<object>((resolve) => { resolveOldAttempts = resolve; });
+      const fetchMock = vi.fn(async (input: string | URL | Request) => {
+        const url = input.toString();
+        if (url.endsWith("/subjects")) return jsonResponse([subject]);
+        if (url.endsWith("/subjects/subject-1/topics")) return jsonResponse([topic, secondTopic]);
+        if (url.endsWith("/topics/topic-1/questions")) return jsonResponse([question]);
+        if (url.endsWith("/topics/topic-2/questions")) return jsonResponse([secondQuestion]);
+        if (url.endsWith("/topics/topic-1/mastery")) return jsonResponse({ topic_id: topic.id, score: "10.00", updated_at: null });
+        if (url.endsWith("/topics/topic-2/mastery")) return jsonResponse({ topic_id: secondTopic.id, score: "60.00", updated_at: "2026-09-12T00:00:00Z" });
+        if (url.endsWith("/questions/question-1/attempts")) return oldAttempts;
+        if (url.endsWith("/questions/question-2/attempts")) return jsonResponse([]);
+        return jsonResponse({ error: { message: "Unexpected request" } }, 500);
+      });
+      vi.stubGlobal("fetch", fetchMock);
+      renderPractice();
+
+      await screen.findByText("Show answer reference");
+      fireEvent.change(screen.getByLabelText("Practice topic"), { target: { value: secondTopic.id } });
+      expect(await screen.findAllByText("Integrate x")).toHaveLength(2);
+
+      resolveOldAttempts?.(outcome === "success"
+        ? jsonResponse([{
+          id: "stale-attempt",
+          question_id: question.id,
+          correct: true,
+          hints_used: 3,
+          solution_seen: true,
+          time_spent_seconds: 999,
+          created_at: "2026-09-12T00:00:00Z",
+        }])
+        : jsonResponse({ error: { message: "Stale attempts failed" } }, 500));
+
+      await waitFor(() => expect(screen.queryByText("999s")).not.toBeInTheDocument());
+      expect(screen.queryByText("Stale attempts failed")).not.toBeInTheDocument();
+      expect(screen.getByLabelText("Current mastery")).toHaveTextContent("60.00");
+    },
+  );
+
+  it("does not let a delayed old-Topic Question create overwrite the new Topic", async () => {
+    const secondTopic = { ...topic, id: "topic-2", name: "Integrals" };
+    let resolveCreate: ((value: object) => void) | undefined;
+    const pendingCreate = new Promise<object>((resolve) => { resolveCreate = resolve; });
+    const fetchMock = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      const url = input.toString();
+      if (init?.method === "POST" && url.endsWith("/topics/topic-1/questions")) return pendingCreate;
+      if (url.endsWith("/subjects")) return jsonResponse([subject]);
+      if (url.endsWith("/subjects/subject-1/topics")) return jsonResponse([topic, secondTopic]);
+      if (url.includes("/topics/") && url.endsWith("/questions")) return jsonResponse([]);
+      if (url.includes("/topics/") && url.endsWith("/mastery")) return jsonResponse({ topic_id: url.includes("topic-2") ? secondTopic.id : topic.id, score: "0.00", updated_at: null });
+      return jsonResponse({ error: { message: "Unexpected request" } }, 500);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    renderPractice();
+
+    await screen.findByText("Create a Question manually, or generate an optional AI preview.");
+    fireEvent.change(screen.getByLabelText("Question prompt"), { target: { value: "Old Topic Question" } });
+    fireEvent.change(screen.getByLabelText("Answer reference"), { target: { value: "Old answer" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add question" }));
+    fireEvent.change(screen.getByLabelText("Practice topic"), { target: { value: secondTopic.id } });
+    await waitFor(() => expect(screen.getByText("Calculus / Integrals")).toBeInTheDocument());
+    fireEvent.change(screen.getByLabelText("Question prompt"), { target: { value: "New Topic Draft" } });
+
+    resolveCreate?.(jsonResponse({ ...question, id: "old-created", prompt: "Old Topic Question" }, 201));
+    await waitFor(() => expect(screen.queryByText("Old Topic Question")).not.toBeInTheDocument());
+    expect(screen.getByLabelText("Question prompt")).toHaveValue("New Topic Draft");
+  });
+
+  it.each(["update", "delete"] as const)(
+    "does not let a delayed old-Topic Question %s overwrite the new Topic",
+    async (operation) => {
+      const secondTopic = { ...topic, id: "topic-2", name: "Integrals" };
+      const secondQuestion = { ...question, id: "question-2", topic_id: secondTopic.id, prompt: "Integrate x" };
+      let resolveWrite: ((value: object) => void) | undefined;
+      const pendingWrite = new Promise<object>((resolve) => { resolveWrite = resolve; });
+      const fetchMock = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        const url = input.toString();
+        if (operation === "update" && init?.method === "PATCH") return pendingWrite;
+        if (operation === "delete" && init?.method === "DELETE") return pendingWrite;
+        if (url.endsWith("/subjects")) return jsonResponse([subject]);
+        if (url.endsWith("/subjects/subject-1/topics")) return jsonResponse([topic, secondTopic]);
+        if (url.endsWith("/topics/topic-1/questions")) return jsonResponse([question]);
+        if (url.endsWith("/topics/topic-2/questions")) return jsonResponse([secondQuestion]);
+        if (url.endsWith("/topics/topic-1/mastery") || url.endsWith("/topics/topic-2/mastery")) return jsonResponse({ topic_id: topic.id, score: "0.00", updated_at: null });
+        if (url.endsWith("/questions/question-1/attempts") || url.endsWith("/questions/question-2/attempts")) return jsonResponse([]);
+        return jsonResponse({ error: { message: "Unexpected request" } }, 500);
+      });
+      vi.stubGlobal("fetch", fetchMock);
+      vi.stubGlobal("confirm", vi.fn().mockReturnValue(true));
+      vi.stubGlobal("prompt", vi.fn()
+        .mockReturnValueOnce("Updated old question")
+        .mockReturnValueOnce("Updated answer")
+        .mockReturnValueOnce("hard"));
+      renderPractice();
+
+      await screen.findByText("Show answer reference");
+      fireEvent.click(screen.getByRole("button", { name: operation === "update" ? "Edit" : "Delete" }));
+      fireEvent.change(screen.getByLabelText("Practice topic"), { target: { value: secondTopic.id } });
+      expect(await screen.findAllByText("Integrate x")).toHaveLength(2);
+
+      resolveWrite?.(operation === "update"
+        ? jsonResponse({ ...question, prompt: "Updated old question" })
+        : ({ ok: true, status: 204, json: vi.fn() }));
+      await waitFor(() => expect(screen.queryByText("Updated old question")).not.toBeInTheDocument());
+      expect(screen.getAllByText("Integrate x")).toHaveLength(2);
+    },
+  );
+
+  it("refreshes the planner for a successful old-context Attempt without contaminating the new Topic", async () => {
+    const secondTopic = { ...topic, id: "topic-2", name: "Integrals" };
+    const secondQuestion = { ...question, id: "question-2", topic_id: secondTopic.id, prompt: "Integrate x" };
+    const onAttemptRecorded = vi.fn();
+    let resolveAttempt: ((value: object) => void) | undefined;
+    const pendingAttempt = new Promise<object>((resolve) => { resolveAttempt = resolve; });
+    const fetchMock = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      const url = input.toString();
+      if (init?.method === "POST" && url.endsWith("/questions/question-1/attempts")) return pendingAttempt;
+      if (url.endsWith("/subjects")) return jsonResponse([subject]);
+      if (url.endsWith("/subjects/subject-1/topics")) return jsonResponse([topic, secondTopic]);
+      if (url.endsWith("/topics/topic-1/questions")) return jsonResponse([question]);
+      if (url.endsWith("/topics/topic-2/questions")) return jsonResponse([secondQuestion]);
+      if (url.endsWith("/topics/topic-1/mastery")) return jsonResponse({ topic_id: topic.id, score: "0.00", updated_at: null });
+      if (url.endsWith("/topics/topic-2/mastery")) return jsonResponse({ topic_id: secondTopic.id, score: "70.00", updated_at: "2026-09-12T00:00:00Z" });
+      if (url.endsWith("/questions/question-1/attempts") || url.endsWith("/questions/question-2/attempts")) return jsonResponse([]);
+      return jsonResponse({ error: { message: "Unexpected request" } }, 500);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    renderPractice({ onAttemptRecorded });
+
+    await screen.findByText("Show answer reference");
+    fireEvent.click(screen.getByRole("button", { name: "Record attempt" }));
+    fireEvent.change(screen.getByLabelText("Practice topic"), { target: { value: secondTopic.id } });
+    await waitFor(() => expect(screen.getByLabelText("Current mastery")).toHaveTextContent("70.00"));
+
+    resolveAttempt?.(jsonResponse({
+      attempt: { id: "attempt-old", question_id: question.id, correct: true, hints_used: 0, solution_seen: false, time_spent_seconds: 0, created_at: "2026-09-12T00:00:00Z" },
+      mastery: { topic_id: topic.id, score: "15.00", updated_at: "2026-09-12T00:00:00Z" },
+    }, 201));
+    await waitFor(() => expect(onAttemptRecorded).toHaveBeenCalledTimes(1));
+    expect(screen.getByLabelText("Current mastery")).toHaveTextContent("70.00");
+    expect(screen.queryByText("Attempt recorded. Mastery updated to 15.00.")).not.toBeInTheDocument();
+    expect(screen.getAllByText("Integrate x")).toHaveLength(2);
   });
 });
 
@@ -312,6 +629,32 @@ function generationResult() {
     prompt_version: "question_generation.v1",
     created_at: "2026-09-12T00:00:00Z",
   };
+}
+
+function renderPractice({
+  onAttemptRecorded,
+  initialSubjectId = subject.id,
+  initialTopicId = topic.id,
+}: {
+  onAttemptRecorded?: () => void;
+  initialSubjectId?: string;
+  initialTopicId?: string;
+} = {}) {
+  function Harness() {
+    const [selection, setSelection] = useState({
+      subjectId: initialSubjectId,
+      topicId: initialTopicId,
+    });
+    return <PracticeManager
+      selectedSubjectId={selection.subjectId}
+      selectedTopicId={selection.topicId}
+      academicRevision={0}
+      onSubjectSelected={(subjectId) => setSelection({ subjectId, topicId: "" })}
+      onTopicSelected={(subjectId, topicId) => setSelection({ subjectId, topicId })}
+      onAttemptRecorded={onAttemptRecorded}
+    />;
+  }
+  return render(<Harness />);
 }
 
 function jsonResponse(payload: object, status = 200) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { api } from "../lib/api";
 import type { Exam, ExamTopic, Subject, Topic } from "../lib/types";
@@ -9,12 +9,23 @@ type FormState = { name: string; description: string };
 const emptyForm: FormState = { name: "", description: "" };
 
 type DomainManagerProps = {
+  selectedSubjectId: string;
+  selectedTopicId: string;
+  onSubjectSelected: (subjectId: string) => void;
+  onTopicSelected: (subjectId: string, topicId: string) => void;
+  onAcademicDataChanged?: () => void;
   onPlannerInputsChanged?: () => void;
 };
 
-export function DomainManager({ onPlannerInputsChanged }: DomainManagerProps = {}) {
+export function DomainManager({
+  selectedSubjectId,
+  selectedTopicId,
+  onSubjectSelected,
+  onTopicSelected,
+  onAcademicDataChanged,
+  onPlannerInputsChanged,
+}: DomainManagerProps) {
   const [subjects, setSubjects] = useState<Subject[]>([]);
-  const [selectedSubjectId, setSelectedSubjectId] = useState("");
   const [topics, setTopics] = useState<Topic[]>([]);
   const [exams, setExams] = useState<Exam[]>([]);
   const [selectedExamId, setSelectedExamId] = useState("");
@@ -25,6 +36,10 @@ export function DomainManager({ onPlannerInputsChanged }: DomainManagerProps = {
   const [assignment, setAssignment] = useState({ topicId: "", weight: "1" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const activeSubjectId = useRef(selectedSubjectId);
+  useLayoutEffect(() => {
+    activeSubjectId.current = selectedSubjectId;
+  }, [selectedSubjectId]);
 
   const selectedSubject = subjects.find((item) => item.id === selectedSubjectId);
   const selectedExam = exams.find((item) => item.id === selectedExamId);
@@ -34,13 +49,19 @@ export function DomainManager({ onPlannerInputsChanged }: DomainManagerProps = {
       .listSubjects()
       .then((items) => {
         setSubjects(items);
-        setSelectedSubjectId((current) => current || items[0]?.id || "");
+        if (!activeSubjectId.current && items[0]) onSubjectSelected(items[0].id);
       })
       .catch((reason: unknown) => setError(errorMessage(reason)))
       .finally(() => setLoading(false));
-  }, []);
+  }, [onSubjectSelected]);
 
   useEffect(() => {
+    queueMicrotask(() => {
+      setTopics([]);
+      setExams([]);
+      setSelectedExamId("");
+      setAssignments([]);
+    });
     if (!selectedSubjectId) {
       return;
     }
@@ -55,7 +76,7 @@ export function DomainManager({ onPlannerInputsChanged }: DomainManagerProps = {
         );
         if (!nextExams.length) setAssignments([]);
       })
-      .catch((reason: unknown) => setError(errorMessage(reason)));
+      .catch((reason: unknown) => { if (!ignore) setError(errorMessage(reason)); });
     return () => { ignore = true; };
   }, [selectedSubjectId]);
 
@@ -67,7 +88,7 @@ export function DomainManager({ onPlannerInputsChanged }: DomainManagerProps = {
     void api
       .listExamTopics(selectedExamId)
       .then((items) => { if (!ignore) setAssignments(items); })
-      .catch((reason: unknown) => setError(errorMessage(reason)));
+      .catch((reason: unknown) => { if (!ignore) setError(errorMessage(reason)); });
     return () => { ignore = true; };
   }, [selectedExamId]);
 
@@ -78,6 +99,7 @@ export function DomainManager({ onPlannerInputsChanged }: DomainManagerProps = {
       setSubjects((items) => [...items, created]);
       chooseSubject(created.id);
       setSubjectForm(emptyForm);
+      onAcademicDataChanged?.();
     });
   }
 
@@ -86,7 +108,9 @@ export function DomainManager({ onPlannerInputsChanged }: DomainManagerProps = {
     await act(async () => {
       const created = await api.createTopic(selectedSubjectId, topicForm);
       setTopics((items) => [...items, created]);
+      onTopicSelected(selectedSubjectId, created.id);
       setTopicForm(emptyForm);
+      onAcademicDataChanged?.();
     });
   }
 
@@ -101,6 +125,7 @@ export function DomainManager({ onPlannerInputsChanged }: DomainManagerProps = {
       setExams((items) => [...items, created]);
       setSelectedExamId(created.id);
       setExamForm({ ...emptyForm, examDate: "" });
+      onAcademicDataChanged?.();
       onPlannerInputsChanged?.();
     });
   }
@@ -132,6 +157,7 @@ export function DomainManager({ onPlannerInputsChanged }: DomainManagerProps = {
         const saved = await api.updateExam(id, { name });
         setExams((items) => replace(items, saved));
       }
+      onAcademicDataChanged?.();
       onPlannerInputsChanged?.();
     });
   }
@@ -142,16 +168,18 @@ export function DomainManager({ onPlannerInputsChanged }: DomainManagerProps = {
       if (kind === "subject") {
         await api.deleteSubject(id);
         setSubjects((items) => items.filter((item) => item.id !== id));
-        if (selectedSubjectId === id) setSelectedSubjectId("");
+        if (selectedSubjectId === id) onSubjectSelected("");
       } else if (kind === "topic") {
         await api.deleteTopic(id);
         setTopics((items) => items.filter((item) => item.id !== id));
+        if (selectedTopicId === id) onTopicSelected(selectedSubjectId, "");
       } else {
         await api.deleteExam(id);
         setExams((items) => items.filter((item) => item.id !== id));
         if (selectedExamId === id) setSelectedExamId("");
         onPlannerInputsChanged?.();
       }
+      onAcademicDataChanged?.();
     });
   }
 
@@ -164,7 +192,7 @@ export function DomainManager({ onPlannerInputsChanged }: DomainManagerProps = {
   }
 
   function chooseSubject(id: string) {
-    setSelectedSubjectId(id);
+    onSubjectSelected(id);
     setTopics([]);
     setExams([]);
     setSelectedExamId("");
@@ -188,7 +216,12 @@ export function DomainManager({ onPlannerInputsChanged }: DomainManagerProps = {
   if (loading) return <p className="panel">Loading subjects…</p>;
 
   return (
-    <div className="space-y-6">
+    <section className="space-y-6" aria-labelledby="academic-setup-heading">
+      <div className="section-introduction">
+        <p className="eyebrow">Curriculum and exams</p>
+        <h2 id="academic-setup-heading">Academic setup</h2>
+        <p className="empty">Create Subjects and Topics, then connect them to future Exams.</p>
+      </div>
       {error && <p role="alert" className="error-banner">{error}</p>}
 
       <section className="panel">
@@ -203,7 +236,7 @@ export function DomainManager({ onPlannerInputsChanged }: DomainManagerProps = {
         {subjects.length === 0 ? <p className="empty">Create your first subject to begin.</p> : (
           <ul className="item-list">{subjects.map((subject) => (
             <li key={subject.id} className={subject.id === selectedSubjectId ? "selected" : ""}>
-              <button className="item-main" onClick={() => chooseSubject(subject.id)}><strong>{subject.name}</strong><span>{subject.description || "No description"}</span></button>
+              <button type="button" aria-pressed={subject.id === selectedSubjectId} className="item-main" onClick={() => chooseSubject(subject.id)}><strong>{subject.name}</strong><span>{subject.description || "No description"}</span></button>
               <button className="quiet" onClick={() => void rename("subject", subject.id, subject.name)}>Rename</button>
               <button className="danger" onClick={() => void remove("subject", subject.id)}>Delete</button>
             </li>
@@ -219,7 +252,13 @@ export function DomainManager({ onPlannerInputsChanged }: DomainManagerProps = {
             <input aria-label="Topic description" placeholder="Description (optional)" value={topicForm.description} onChange={(event) => setTopicForm({ ...topicForm, description: event.target.value })} />
             <button type="submit">Add topic</button>
           </form>
-          <EntityList items={topics} onRename={(item) => rename("topic", item.id, item.name)} onDelete={(item) => remove("topic", item.id)} />
+          <TopicList
+            items={topics}
+            selectedTopicId={selectedTopicId}
+            onSelect={(item) => onTopicSelected(selectedSubjectId, item.id)}
+            onRename={(item) => rename("topic", item.id, item.name)}
+            onDelete={(item) => remove("topic", item.id)}
+          />
         </section>
 
         <section className="panel">
@@ -230,13 +269,13 @@ export function DomainManager({ onPlannerInputsChanged }: DomainManagerProps = {
             <input aria-label="Exam description" placeholder="Description (optional)" value={examForm.description} onChange={(event) => setExamForm({ ...examForm, description: event.target.value })} />
             <button type="submit">Add exam</button>
           </form>
-          <ul className="item-list">{exams.map((exam) => (
+          {exams.length === 0 ? <p className="empty">Create a future Exam for this Subject.</p> : <ul className="item-list">{exams.map((exam) => (
             <li key={exam.id} className={exam.id === selectedExamId ? "selected" : ""}>
-              <button className="item-main" onClick={() => chooseExam(exam.id)}><strong>{exam.name}</strong><span>{new Date(exam.exam_date).toLocaleString()}</span></button>
+              <button type="button" aria-pressed={exam.id === selectedExamId} className="item-main" onClick={() => chooseExam(exam.id)}><strong>{exam.name}</strong><span>{new Date(exam.exam_date).toLocaleString()}</span></button>
               <button className="quiet" onClick={() => void rename("exam", exam.id, exam.name)}>Rename</button>
               <button className="danger" onClick={() => void remove("exam", exam.id)}>Delete</button>
             </li>
-          ))}</ul>
+          ))}</ul>}
         </section>
       </div>}
 
@@ -249,17 +288,17 @@ export function DomainManager({ onPlannerInputsChanged }: DomainManagerProps = {
           <input aria-label="Topic weight" required type="number" min="0.01" max="1" step="0.01" value={assignment.weight} onChange={(event) => setAssignment({ ...assignment, weight: event.target.value })} />
           <button type="submit">Save weight</button>
         </form>
-        <ul className="item-list">{assignments.map((item) => (
+        {assignments.length === 0 ? <p className="empty">Assign at least one Topic so this Exam can contribute recommendations.</p> : <ul className="item-list">{assignments.map((item) => (
           <li key={item.topic_id}><div className="item-main"><strong>{topics.find((topic) => topic.id === item.topic_id)?.name ?? "Topic"}</strong><span>Weight {item.weight}</span></div><button className="danger" onClick={() => void removeAssignment(item.topic_id)}>Remove</button></li>
-        ))}</ul>
+        ))}</ul>}
       </section>}
-    </div>
+    </section>
   );
 }
 
-function EntityList<T extends { id: string; name: string; description: string | null }>({ items, onRename, onDelete }: { items: T[]; onRename: (item: T) => Promise<void>; onDelete: (item: T) => Promise<void> }) {
-  if (!items.length) return <p className="empty">Nothing here yet.</p>;
-  return <ul className="item-list">{items.map((item) => <li key={item.id}><div className="item-main"><strong>{item.name}</strong><span>{item.description || "No description"}</span></div><button className="quiet" onClick={() => void onRename(item)}>Rename</button><button className="danger" onClick={() => void onDelete(item)}>Delete</button></li>)}</ul>;
+function TopicList({ items, selectedTopicId, onSelect, onRename, onDelete }: { items: Topic[]; selectedTopicId: string; onSelect: (item: Topic) => void; onRename: (item: Topic) => Promise<void>; onDelete: (item: Topic) => Promise<void> }) {
+  if (!items.length) return <p className="empty">Add a Topic to define what you want to practice.</p>;
+  return <ul className="item-list">{items.map((item) => <li key={item.id} className={item.id === selectedTopicId ? "selected" : ""}><button type="button" aria-pressed={item.id === selectedTopicId} className="item-main" onClick={() => onSelect(item)}><strong>{item.name}</strong><span>{item.description || "No description"}</span></button><button className="quiet" onClick={() => void onRename(item)}>Rename</button><button className="danger" onClick={() => void onDelete(item)}>Delete</button></li>)}</ul>;
 }
 
 function replace<T extends { id: string }>(items: T[], saved: T): T[] {

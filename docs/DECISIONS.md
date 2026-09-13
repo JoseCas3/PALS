@@ -121,3 +121,15 @@ The complete queue is returned, with its first item serving as the recommendatio
 persisted or cached, and neither AI nor Questions participate. Exam importance and cross-Exam weight
 normalization are deferred because Alpha has no supporting domain data and should require no extra
 configuration.
+
+## ADR-024 In-memory Alpha workspace coordination
+
+Accepted. `LearningWorkspace` owns only cross-panel Practice selection and revision counters.
+Children retain API and domain state. Global recommendations set Subject and Topic atomically;
+Subject-only changes clear Topic, planner reranking does not navigate, and Exam identity does not
+enter Practice. URL persistence and global state libraries are deferred because they add no required
+Alpha capability.
+
+Async Practice operations are context guarded. Completed writes remain valid on the server, but
+old-context results and errors cannot contaminate the current Topic. Successful Attempts always
+refresh the Global Planner because they are valid evidence even after navigation.

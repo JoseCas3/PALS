@@ -2,6 +2,9 @@
 
 Base: `/api/v1`
 
+Sprint 7 adds no endpoint or backend contract. The Alpha workspace composes these existing APIs in the
+frontend; Practice selection and refresh revisions are in-memory UI concerns and are never persisted.
+
 ## Subjects
 
 - `GET /subjects` → 200

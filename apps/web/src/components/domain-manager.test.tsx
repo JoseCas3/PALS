@@ -1,4 +1,5 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { DomainManager } from "./domain-manager";
@@ -23,7 +24,7 @@ describe("DomainManager", () => {
       return jsonResponse([]);
     });
     vi.stubGlobal("fetch", fetchMock);
-    render(<DomainManager />);
+    renderDomain();
 
     await screen.findByText("Create your first subject to begin.");
     fireEvent.change(screen.getByLabelText("Subject name"), { target: { value: "Calculus" } });
@@ -38,7 +39,7 @@ describe("DomainManager", () => {
 
   it("shows the API error message", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse({ error: { message: "API failed" } }, 500)));
-    render(<DomainManager />);
+    renderDomain();
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("API failed"));
   });
 
@@ -63,7 +64,10 @@ describe("DomainManager", () => {
       return jsonResponse({ error: { message: "Unexpected request" } }, 500);
     });
     vi.stubGlobal("fetch", fetchMock);
-    render(<DomainManager onPlannerInputsChanged={onPlannerInputsChanged} />);
+    renderDomain({
+      initialSubjectId: subject.id,
+      onPlannerInputsChanged,
+    });
 
     await screen.findByRole("heading", { name: "Weighted topics" });
     fireEvent.change(screen.getByLabelText("Topic to assign"), {
@@ -80,6 +84,34 @@ describe("DomainManager", () => {
     expect(onPlannerInputsChanged).toHaveBeenCalledTimes(1);
   });
 });
+
+function renderDomain({
+  initialSubjectId = "",
+  initialTopicId = "",
+  onPlannerInputsChanged,
+  onAcademicDataChanged,
+}: {
+  initialSubjectId?: string;
+  initialTopicId?: string;
+  onPlannerInputsChanged?: () => void;
+  onAcademicDataChanged?: () => void;
+} = {}) {
+  function Harness() {
+    const [selection, setSelection] = useState({
+      subjectId: initialSubjectId,
+      topicId: initialTopicId,
+    });
+    return <DomainManager
+      selectedSubjectId={selection.subjectId}
+      selectedTopicId={selection.topicId}
+      onSubjectSelected={(subjectId) => setSelection({ subjectId, topicId: "" })}
+      onTopicSelected={(subjectId, topicId) => setSelection({ subjectId, topicId })}
+      onAcademicDataChanged={onAcademicDataChanged}
+      onPlannerInputsChanged={onPlannerInputsChanged}
+    />;
+  }
+  return render(<Harness />);
+}
 
 function jsonResponse(payload: object, status = 200) {
   return { ok: status >= 200 && status < 300, status, json: vi.fn().mockResolvedValue(payload) };

@@ -176,3 +176,25 @@ Exam and its assigned Topics. It reuses the Sprint 3 Decimal formula without cro
 normalization: past Exams are excluded, an Exam exactly at the captured time is included, and the
 same Topic appears once per ExamTopic obligation. The first server-ranked item is the current
 recommendation. Plans remain calculated on demand, uncached, unpersisted, and independent of AI.
+
+## Alpha workflow
+
+1. Create a Subject.
+2. Create a Topic.
+3. Create a future Exam.
+4. Assign the Topic to the Exam with a weight.
+5. Review the Global Study Plan.
+6. Choose **Practice this topic** on a recommendation.
+7. Create or select a Question and record an explicit Attempt.
+8. Observe the Mastery update and Global Study Plan reranking.
+
+Sprint 7 keeps the selected Subject and Topic in browser memory, so a reload may reset the UI
+selection. Academic data, Questions, Attempts, and Mastery remain persisted in PostgreSQL. Tutor and
+Question Generation are optional: the deterministic workflow works with `AI_API_KEY` blank.
+
+Run the browser-level Alpha flow against an isolated disposable database with:
+
+```bash
+cd apps/web
+npm run test:e2e
+```

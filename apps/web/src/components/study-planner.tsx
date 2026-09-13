@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { api } from "../lib/api";
 import type { Exam, PlannerFactorCode, StudyPlan, Subject } from "../lib/types";
@@ -11,7 +11,7 @@ const factorLabels: Record<PlannerFactorCode, string> = {
   exam_weight: "Exam weight",
 };
 
-export function StudyPlanner() {
+export function StudyPlanner({ academicRevision = 0 }: { academicRevision?: number }) {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [subjectId, setSubjectId] = useState("");
   const [exams, setExams] = useState<Exam[]>([]);
@@ -20,17 +20,24 @@ export function StudyPlanner() {
   const [loadingSubjects, setLoadingSubjects] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState("");
+  const planRequest = useRef(0);
+  const activeExamId = useRef(examId);
+  useLayoutEffect(() => {
+    activeExamId.current = examId;
+  }, [examId]);
 
   useEffect(() => {
     void api
       .listSubjects()
       .then((items) => {
         setSubjects(items);
-        setSubjectId(items[0]?.id ?? "");
+        setSubjectId((current) =>
+          items.some((subject) => subject.id === current) ? current : (items[0]?.id ?? ""),
+        );
       })
       .catch((reason: unknown) => setError(errorMessage(reason)))
       .finally(() => setLoadingSubjects(false));
-  }, []);
+  }, [academicRevision]);
 
   useEffect(() => {
     if (!subjectId) return;
@@ -40,7 +47,17 @@ export function StudyPlanner() {
       .then((items) => {
         if (ignore) return;
         setExams(items);
-        setExamId(items[0]?.id ?? "");
+        const nextExamId = items.some((exam) => exam.id === examId)
+          ? examId
+          : (items[0]?.id ?? "");
+        if (nextExamId !== examId) {
+          planRequest.current += 1;
+          setGenerating(false);
+        }
+        setExamId(nextExamId);
+        setPlan((current) =>
+          current && items.some((exam) => exam.id === current.exam_id) ? current : null,
+        );
       })
       .catch((reason: unknown) => {
         if (!ignore) setError(errorMessage(reason));
@@ -48,9 +65,10 @@ export function StudyPlanner() {
     return () => {
       ignore = true;
     };
-  }, [subjectId]);
+  }, [academicRevision, examId, subjectId]);
 
   function chooseSubject(nextSubjectId: string) {
+    planRequest.current += 1;
     setSubjectId(nextSubjectId);
     setExams([]);
     setExamId("");
@@ -59,6 +77,7 @@ export function StudyPlanner() {
   }
 
   function chooseExam(nextExamId: string) {
+    planRequest.current += 1;
     setExamId(nextExamId);
     setPlan(null);
     setError("");
@@ -66,15 +85,22 @@ export function StudyPlanner() {
 
   async function generatePlan() {
     if (!examId || generating) return;
+    const requestedExamId = examId;
+    const request = ++planRequest.current;
     setGenerating(true);
     setError("");
     try {
-      setPlan(await api.getStudyPlan(examId));
+      const nextPlan = await api.getStudyPlan(requestedExamId);
+      if (request !== planRequest.current || activeExamId.current !== requestedExamId) return;
+      setPlan(nextPlan);
     } catch (reason) {
+      if (request !== planRequest.current || activeExamId.current !== requestedExamId) return;
       setPlan(null);
       setError(errorMessage(reason));
     } finally {
-      setGenerating(false);
+      if (request === planRequest.current && activeExamId.current === requestedExamId) {
+        setGenerating(false);
+      }
     }
   }
 

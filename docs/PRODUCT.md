@@ -79,3 +79,14 @@ documents, and generated answer references may be inaccurate; human review is re
   normalization in Alpha.
 - The complete queue is returned in deterministic order, and its first item is the recommendation.
 - Global planning is calculated on demand, read-only, unpersisted, and uses no AI.
+
+## Sprint 7 Alpha integration
+
+- Every Global Study Plan item can select its Subject and Topic directly in Practice.
+- Subject and Topic selection is shared across the single-page workspace; Exam identity remains
+  explanatory context and is not transferred into Topic-based Practice.
+- Successful Attempts update visible Mastery, refresh the Global Study Plan, and never move the
+  user away from the active Topic.
+- Academic mutations refresh dependent selectors without requiring a browser reload.
+- Navigation state is in memory. Reloading may reset selection but does not remove persisted data.
+- Tutor and Question Generation remain optional and never produce learning evidence.

@@ -100,3 +100,19 @@ return order is irrelevant and no per-Exam or per-Topic query is issued.
 
 Global planning contains no write, lock, commit, AI, Question, Attempt, or AIInteraction path. The
 queue is returned on demand with `Cache-Control: no-store`; no plan or recommendation is stored.
+
+## Sprint 7 frontend coordination
+
+`LearningWorkspace` is the narrow coordination boundary for cross-panel UI state. It owns the
+selected Practice Subject/Topic IDs plus monotonic academic and planner revisions. DomainManager,
+PracticeManager, and both planners retain their entity lists, forms, requests, and domain-specific
+state.
+
+Global planner actions and DomainManager Topic selection call one typed parent operation that sets
+Subject and Topic atomically. A Subject-only change clears Topic. Exam identity is deliberately not
+part of Practice context. Selection is not persisted or encoded in the URL.
+
+Practice requests and writes capture their initiating Topic, Question where applicable, and context
+generation. Valid backend writes finish normally, but delayed results or errors cannot mutate a
+newer UI context. A successful Attempt always advances the planner revision even if the user has
+already navigated elsewhere because its persisted evidence remains authoritative.
