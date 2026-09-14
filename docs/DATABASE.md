@@ -1,4 +1,15 @@
-# PALS Database — Sprint 2 Implemented Schema
+# PALS Database — Current Implemented Schema
+
+## R1 documents
+
+`documents` stores a UUID identity, Subject foreign key, original filename metadata, unique opaque
+storage key, MIME type, byte size, SHA-256 checksum, lifecycle status, processing version, nullable
+error and future embedding metadata, and timestamps. PDF bytes are never stored in PostgreSQL.
+
+`UNIQUE(subject_id, checksum_sha256)` enforces Subject-scoped content identity. The Subject foreign
+key uses `ON DELETE CASCADE`; the Subject service removes physical files before committing a valid
+Subject deletion. An index on `(subject_id, created_at, id)` supports deterministic Subject lists.
+Migration `20260913_05` creates only this table, its constraints, and its index.
 
 ## subjects
 

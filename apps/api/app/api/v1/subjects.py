@@ -4,7 +4,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.dependencies import get_session
+from app.api.dependencies import DocumentStorageDependency, get_session
 from app.schemas.exam import ExamCreate, ExamResponse
 from app.schemas.subject import SubjectCreate, SubjectResponse, SubjectUpdate
 from app.schemas.topic import TopicCreate, TopicResponse
@@ -45,8 +45,10 @@ async def update_subject(
 
 
 @router.delete("/subjects/{subject_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_subject(subject_id: uuid.UUID, session: Session) -> Response:
-    await SubjectService(session).delete(subject_id)
+async def delete_subject(
+    subject_id: uuid.UUID, session: Session, storage: DocumentStorageDependency
+) -> Response:
+    await SubjectService(session, storage).delete(subject_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

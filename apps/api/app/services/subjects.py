@@ -1,3 +1,4 @@
+import asyncio
 import uuid
 
 from fastapi import status
@@ -6,14 +7,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import ApplicationError
 from app.models.subject import Subject
+from app.repositories.documents import DocumentRepository
 from app.repositories.subjects import SubjectRepository
 from app.schemas.subject import SubjectCreate, SubjectUpdate
+from app.storage.documents import DocumentStorage, DocumentStorageError
 
 
 class SubjectService:
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(self, session: AsyncSession, storage: DocumentStorage | None = None) -> None:
         self.session = session
+        self.storage = storage
         self.subjects = SubjectRepository(session)
+        self.documents = DocumentRepository(session)
 
     async def list(self) -> list[Subject]:
         return await self.subjects.list()
@@ -52,6 +57,20 @@ class SubjectService:
                 "SUBJECT_HAS_EXAMS",
                 "Subject cannot be deleted while it has exams",
             )
+        documents = await self.documents.list_for_subject(subject_id)
+        storage = self.storage
+        if documents:
+            if storage is None:
+                raise RuntimeError(
+                    "Document storage is required to delete a Subject with Documents"
+                )
+            try:
+                for document in documents:
+                    await asyncio.to_thread(storage.delete, document.storage_key)
+            except DocumentStorageError as exc:
+                raise ApplicationError(
+                    500, "DOCUMENT_STORAGE_ERROR", "Document storage operation failed"
+                ) from exc
         try:
             await self.subjects.delete(subject)
             await self.session.commit()

@@ -3,6 +3,7 @@
 import { useCallback, useState } from "react";
 
 import { DomainManager } from "./domain-manager";
+import { DocumentManager } from "./document-manager";
 import { GlobalStudyPlanner } from "./global-study-planner";
 import { PracticeManager } from "./practice-manager";
 import { StudyPlanner } from "./study-planner";
@@ -62,6 +63,9 @@ export function LearningWorkspace() {
           onAcademicDataChanged={refreshAcademicData}
           onPlannerInputsChanged={refreshGlobalPlan}
         />
+      </div>
+      <div className="mt-6">
+        <DocumentManager selectedSubjectId={practiceSelection.subjectId} />
       </div>
       <div className="mt-6"><StudyPlanner academicRevision={academicRevision} /></div>
     </>

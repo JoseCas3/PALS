@@ -104,6 +104,10 @@ npm run build
 The browser reads `NEXT_PUBLIC_API_URL` directly. `CORS_ORIGINS` is a comma-separated list of
 the web origins allowed to make local API requests.
 
+PDF uploads use persistent local storage. `DOCUMENT_STORAGE_ROOT` selects the storage root and
+`DOCUMENT_MAX_SIZE_BYTES` sets the upload limit (25 MiB by default). Docker Compose stores files
+in the named `document_data` volume, so normal container recreation does not remove them.
+
 ## Sprint 1 domain core
 
 Sprint 1 adds Subjects, Topics, Exams, and weighted ExamTopic associations under
@@ -207,3 +211,10 @@ Run the browser-level Alpha flow against an isolated disposable database with:
 cd apps/web
 npm run test:e2e
 ```
+
+## Post-Alpha RAG R1 document domain
+
+R1 adds Subject-owned PDF Documents with PostgreSQL metadata and opaque-key local filesystem
+storage. Uploads are validated, fingerprinted with SHA-256, and created as `UPLOADED`; no text
+extraction, chunking, embeddings, retrieval, grounding, or citations are implemented. See
+`docs/RAG_R1.md` and `docs/RAG_ARCHITECTURE.md`.

@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 
+from app.api.v1.documents import router as documents_router
 from app.api.v1.exams import router as exams_router
 from app.api.v1.mastery import router as mastery_router
 from app.api.v1.planner import router as planner_router
@@ -11,6 +12,7 @@ from app.api.v1.tutor import router as tutor_router
 
 router = APIRouter(prefix="/api/v1")
 router.include_router(subjects_router)
+router.include_router(documents_router)
 router.include_router(topics_router)
 router.include_router(exams_router)
 router.include_router(questions_router)

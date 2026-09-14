@@ -2,11 +2,11 @@ services:
   postgres-e2e:
     image: postgres:17-bookworm
     environment:
-      POSTGRES_DB: pals_e2e
+      POSTGRES_DB: pals_e2e_test
       POSTGRES_USER: pals
       POSTGRES_PASSWORD: pals
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U pals -d pals_e2e"]
+      test: ["CMD-SHELL", "pg_isready -U pals -d pals_e2e_test"]
       interval: 2s
       timeout: 5s
       retries: 15
@@ -18,12 +18,14 @@ services:
       context: ./apps/api
     command: ["sh", "-c", "python -m alembic upgrade head && python -m uvicorn app.main:app --host 0.0.0.0 --port 8000"]
     environment:
-      DATABASE_URL: postgresql+asyncpg://pals:pals@postgres-e2e:5432/pals_e2e
+      DATABASE_URL: postgresql+asyncpg://pals:pals@postgres-e2e:5432/pals_e2e_test
       CORS_ORIGINS: http://127.0.0.1:3100,http://localhost:3100
       AI_PROVIDER: openai
       AI_MODEL: gpt-5-mini
       AI_API_KEY: ""
       AI_TIMEOUT_SECONDS: 20
+      DOCUMENT_STORAGE_ROOT: /var/lib/pals/documents
+      DOCUMENT_MAX_SIZE_BYTES: 26214400
     depends_on:
       postgres-e2e:
         condition: service_healthy
@@ -34,3 +36,5 @@ services:
       retries: 20
     ports:
       - "127.0.0.1:8100:8000"
+    tmpfs:
+      - /var/lib/pals/documents

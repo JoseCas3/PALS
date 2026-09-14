@@ -31,6 +31,25 @@ export type ExamTopic = {
   weight: number;
 };
 
+export type DocumentStatus = "UPLOADED" | "PROCESSING" | "READY" | "FAILED";
+
+export type Document = {
+  id: string;
+  subject_id: string;
+  original_filename: string;
+  mime_type: string;
+  size_bytes: number;
+  checksum_sha256: string;
+  status: DocumentStatus;
+  error_code: string | null;
+  processing_version: number;
+  embedding_provider: string | null;
+  embedding_model: string | null;
+  embedding_dimensions: number | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type QuestionDifficulty = "easy" | "medium" | "hard";
 export type GenerationDifficulty = QuestionDifficulty | "mixed";
 

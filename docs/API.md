@@ -13,6 +13,22 @@ frontend; Practice selection and refresh revisions are in-memory UI concerns and
 - `PATCH /subjects/{id}` → 200
 - `DELETE /subjects/{id}` → 204, or 409 when Topics or Exams exist
 
+## Documents
+
+- `POST /subjects/{subject_id}/documents` returns 201 and accepts multipart field `file`.
+- `GET /subjects/{subject_id}/documents` returns 200 with an oldest-first Subject-scoped list.
+- `GET /documents/{document_id}` returns 200 with public metadata.
+- `DELETE /documents/{document_id}` returns 204 after deleting the file and row.
+
+R1 accepts PDF files only. It validates extension, supplied MIME type, configured size limit, and
+the `%PDF-` signature before storing bytes under an opaque key. Responses never expose the storage
+key or filesystem path. Duplicate content within one Subject returns 409
+`DOCUMENT_ALREADY_EXISTS`; the same content in a different Subject is allowed. Valid Subject
+deletion also cleans associated Document files and cascades their metadata rows.
+
+Document errors use `UNSUPPORTED_FILE_TYPE`, `FILE_TOO_LARGE`, `INVALID_PDF`,
+`DOCUMENT_ALREADY_EXISTS`, `DOCUMENT_NOT_FOUND`, and `DOCUMENT_STORAGE_ERROR` as applicable.
+
 ## Topics
 
 - `GET /subjects/{id}/topics` → 200

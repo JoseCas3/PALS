@@ -1,4 +1,5 @@
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -15,6 +16,8 @@ class Settings(BaseSettings):
     ai_model: str = "gpt-5-mini"
     ai_api_key: SecretStr | None = None
     ai_timeout_seconds: float = Field(default=20.0, gt=0)
+    document_storage_root: Path = Path("./data/documents")
+    document_max_size_bytes: int = Field(default=25 * 1024 * 1024, gt=0)
 
     @property
     def allowed_origins(self) -> list[str]:

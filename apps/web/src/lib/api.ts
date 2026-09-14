@@ -1,6 +1,7 @@
 import type {
   Attempt,
   AttemptResult,
+  Document,
   Exam,
   ExamTopic,
   Mastery,
@@ -22,11 +23,12 @@ type ErrorEnvelope = {
 };
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const isFormData = typeof FormData !== "undefined" && init?.body instanceof FormData;
   const response = await fetch(`${API_URL}/api/v1${path}`, {
     ...init,
     headers: {
       Accept: "application/json",
-      ...(init?.body ? { "Content-Type": "application/json" } : {}),
+      ...(init?.body && !isFormData ? { "Content-Type": "application/json" } : {}),
       ...init?.headers,
     },
   });
@@ -57,6 +59,19 @@ export const api = {
   updateSubject: (id: string, value: { name: string }) =>
     request<Subject>(`/subjects/${id}`, { method: "PATCH", ...body(value) }),
   deleteSubject: (id: string) => request<void>(`/subjects/${id}`, { method: "DELETE" }),
+
+  listDocuments: (subjectId: string) =>
+    request<Document[]>(`/subjects/${subjectId}/documents`),
+  uploadDocument: (subjectId: string, file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    return request<Document>(`/subjects/${subjectId}/documents`, {
+      method: "POST",
+      body: form,
+    });
+  },
+  deleteDocument: (id: string) =>
+    request<void>(`/documents/${id}`, { method: "DELETE" }),
 
   listTopics: (subjectId: string) => request<Topic[]>(`/subjects/${subjectId}/topics`),
   createTopic: (subjectId: string, value: { name: string; description?: string }) =>

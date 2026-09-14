@@ -12,6 +12,7 @@ Modular monolith.
 
 FastAPI modules:
 - subjects
+- documents
 - topics
 - exams
 - questions
@@ -19,6 +20,12 @@ FastAPI modules:
 - mastery
 - planner
 - AI
+
+The R1 Document module follows the same route to service to repository layering. PDF bytes are
+owned by the `DocumentStorage` boundary and its local filesystem implementation; PostgreSQL stores
+only metadata and an opaque storage key. Document operations have no dependency on Attempt,
+Mastery, planner, Tutor, Question Generation, or the AI Gateway. The complete frozen RAG direction
+is documented in `RAG_ARCHITECTURE.md`.
 
 ## Backend layers
 API routes → services → repositories → database

@@ -1,4 +1,5 @@
 from collections.abc import AsyncIterator
+from pathlib import Path
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -7,13 +8,24 @@ from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.pool import NullPool
 
-from app.api.dependencies import get_session
+from app.api.dependencies import get_document_storage, get_session
 from app.core.config import get_settings
 from app.db.base import Base
 from app.main import app as fastapi_app
-from app.models import AIInteraction, Attempt, Exam, ExamTopic, Mastery, Question, Subject, Topic
+from app.models import (
+    AIInteraction,
+    Attempt,
+    Document,
+    Exam,
+    ExamTopic,
+    Mastery,
+    Question,
+    Subject,
+    Topic,
+)
+from app.storage.documents import LocalDocumentStorage
 
-_MODELS = (AIInteraction, Attempt, Exam, ExamTopic, Mastery, Question, Subject, Topic)
+_MODELS = (AIInteraction, Attempt, Document, Exam, ExamTopic, Mastery, Question, Subject, Topic)
 test_database_url = get_settings().database_url
 test_database_name = make_url(test_database_url).database or ""
 if not test_database_name.endswith("_test"):
@@ -73,12 +85,20 @@ async def db_session() -> AsyncIterator[AsyncSession]:
 
 
 @pytest.fixture
-async def async_client(db_session: AsyncSession) -> AsyncIterator[AsyncClient]:
+def document_storage(tmp_path: Path) -> LocalDocumentStorage:
+    return LocalDocumentStorage(tmp_path / "documents")
+
+
+@pytest.fixture
+async def async_client(
+    db_session: AsyncSession, document_storage: LocalDocumentStorage
+) -> AsyncIterator[AsyncClient]:
 
     async def override_session() -> AsyncIterator[AsyncSession]:
         yield db_session
 
     fastapi_app.dependency_overrides[get_session] = override_session
+    fastapi_app.dependency_overrides[get_document_storage] = lambda: document_storage
     async with AsyncClient(
         transport=ASGITransport(app=fastapi_app), base_url="http://test"
     ) as client:
