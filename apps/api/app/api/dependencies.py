@@ -9,6 +9,9 @@ from app.ai.gateway import AIGateway
 from app.core.config import get_settings
 from app.core.errors import ApplicationError
 from app.db.session import async_session_factory
+from app.embeddings.contracts import EmbeddingProvider
+from app.embeddings.factory import create_embedding_provider
+from app.embeddings.openai import OpenAIEmbeddingProvider
 from app.ingestion.extraction import DocumentExtractor, PypdfDocumentExtractor
 from app.storage.documents import DocumentStorage, LocalDocumentStorage
 
@@ -61,6 +64,16 @@ def get_document_extractor() -> DocumentExtractor:
     return PypdfDocumentExtractor()
 
 
+async def get_embedding_provider() -> AsyncIterator[EmbeddingProvider]:
+    provider = create_embedding_provider(get_settings())
+    try:
+        yield provider
+    finally:
+        if isinstance(provider, OpenAIEmbeddingProvider):
+            await provider.aclose()
+
+
 DocumentStorageDependency = Annotated[DocumentStorage, Depends(get_document_storage)]
 DocumentMaxSizeDependency = Annotated[int, Depends(get_document_max_size_bytes)]
 DocumentExtractorDependency = Annotated[DocumentExtractor, Depends(get_document_extractor)]
+EmbeddingProviderDependency = Annotated[EmbeddingProvider, Depends(get_embedding_provider)]

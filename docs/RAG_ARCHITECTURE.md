@@ -25,9 +25,9 @@ delegates business and transaction rules to `DocumentService`, which uses `Docum
 PostgreSQL metadata and `DocumentStorage` for bytes. Storage resolution is private to the storage
 implementation; routes and public schemas never receive physical paths.
 
-The AI Gateway remains the only provider boundary. Future embedding support must use a separate
-provider-neutral embedding contract and adapter rather than importing a vendor SDK into Document,
-retrieval, Tutor, or Question Generation modules.
+The AI Gateway remains the generative provider boundary. R3 embeddings use the separate
+provider-neutral `EmbeddingProvider` and `EmbeddingService`; OpenAI SDK details remain inside the
+embedding adapter and never enter ingestion, retrieval, Tutor, or Question Generation modules.
 
 ## Local storage strategy
 
@@ -61,22 +61,25 @@ AIInteraction, or planner inputs.
 R2 processing reads through `DocumentStorage`, extracts immutable one-based page values through a
 library-neutral `DocumentExtractor`, normalizes each page with deterministic NFC-based rules, and
 produces transient page-aware lexical-token chunks. Blocking parsing runs outside the event loop
-and outside a database transaction. R2 persists only lifecycle status and safe error codes.
+and outside a database transaction. R3 embeds the complete transient chunk set outside a database
+transaction, then atomically replaces derived chunks and publishes one embedding profile with
+READY. PostgreSQL owns chunks through a cascading foreign key; pgvector stores fixed 1,536-value
+vectors. No similarity endpoint or ANN index exists in R3.
 
-## R1-R2 status semantics
+## R1-R3 status semantics
 
 The controlled statuses are `UPLOADED`, `PROCESSING`, `READY`, and `FAILED`. R1 creates only
-`UPLOADED`; R2 atomically claims processing and records READY or FAILED. R2 READY is an intermediate
-milestone meaning deterministic extraction, normalization, and transient chunking succeeded. It
-does not mean retrieval-ready. R3 will extend READY publication to require persisted chunks and
-embeddings. `processing_version` starts at 1; embedding metadata remains null in R2.
+`UPLOADED`; processing atomically claims work and records READY or FAILED. R3 READY means a complete
+persisted chunk set with validated embeddings and matching Document profile metadata. An R2 READY
+row with null embedding metadata and zero chunks can be explicitly processed once for upgrade; no
+migration or startup path calls an embedding provider.
 
 ## Future extraction, chunks, embeddings, and retrieval
 
 R2 adds synchronous PDF text extraction, deterministic normalization, and transient chunks without
-OCR. R3 may add DocumentChunk records with stable ordering and provenance plus a provider-neutral
-embedding service and PostgreSQL pgvector storage; PALS will not use an external vector database.
-Retrieval may then combine Subject scope, similarity, thresholds, and stable ordering before Tutor
+OCR. R3 adds DocumentChunk records with stable ordering and provenance plus a provider-neutral
+embedding service and PostgreSQL pgvector storage; PALS does not use an external vector database.
+R4 may combine Subject scope, cosine similarity, thresholds, and stable ordering before Tutor
 or Question Generation consume grounded context and return citations.
 
 Processing remains synchronous initially. Workers are deferred until measured workload requires

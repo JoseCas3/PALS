@@ -1,6 +1,7 @@
 from app.models.ai_interaction import AIInteraction
 from app.models.attempt import Attempt
 from app.models.document import Document
+from app.models.document_chunk import DocumentChunk
 from app.models.exam import Exam
 from app.models.exam_topic import ExamTopic
 from app.models.mastery import Mastery
@@ -12,6 +13,7 @@ __all__ = [
     "AIInteraction",
     "Attempt",
     "Document",
+    "DocumentChunk",
     "Exam",
     "ExamTopic",
     "Mastery",

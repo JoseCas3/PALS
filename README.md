@@ -108,7 +108,10 @@ PDF uploads use persistent local storage. `DOCUMENT_STORAGE_ROOT` selects the st
 `DOCUMENT_MAX_SIZE_BYTES` sets the upload limit (25 MiB by default). Docker Compose stores files
 in the named `document_data` volume, so normal container recreation does not remove them.
 R2 processing uses `RAG_CHUNK_TARGET_TOKENS` (800 by default) and
-`RAG_CHUNK_OVERLAP_TOKENS` (120 by default) for deterministic transient chunks.
+`RAG_CHUNK_OVERLAP_TOKENS` (120 by default) for deterministic chunks. R3 publishes those chunks
+with embeddings to PostgreSQL pgvector. The active profile defaults to OpenAI
+`text-embedding-3-small`, 1,536 dimensions, and batches of 64; tests and E2E use the deterministic
+fake provider and never require a key or network call.
 
 ## Sprint 1 domain core
 
@@ -217,7 +220,7 @@ npm run test:e2e
 ## Post-Alpha RAG R1 document domain
 
 R1 adds Subject-owned PDF Documents with PostgreSQL metadata and opaque-key local filesystem
-storage. Uploads are validated, fingerprinted with SHA-256, and created as `UPLOADED`; extraction
-does not occur during upload. R2 adds explicit local processing into transient page-aware chunks.
-Embeddings, retrieval, grounding, and citations remain unimplemented. See `docs/RAG_R1.md`,
-`docs/RAG_R2.md`, and `docs/RAG_ARCHITECTURE.md`.
+storage. R2 adds explicit deterministic PDF extraction and page-aware chunking. R3 adds a separate
+embedding boundary, pgvector 0.8.6, persistent `DocumentChunk` rows, and atomic retrieval-ready
+publication. Retrieval, grounding, and citations remain deferred. See `docs/RAG_R1.md`,
+`docs/RAG_R2.md`, `docs/RAG_R3.md`, and `docs/RAG_ARCHITECTURE.md`.

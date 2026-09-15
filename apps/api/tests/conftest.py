@@ -8,14 +8,16 @@ from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.pool import NullPool
 
-from app.api.dependencies import get_document_storage, get_session
+from app.api.dependencies import get_document_storage, get_embedding_provider, get_session
 from app.core.config import get_settings
 from app.db.base import Base
+from app.embeddings.fake import FakeEmbeddingProvider
 from app.main import app as fastapi_app
 from app.models import (
     AIInteraction,
     Attempt,
     Document,
+    DocumentChunk,
     Exam,
     ExamTopic,
     Mastery,
@@ -25,7 +27,18 @@ from app.models import (
 )
 from app.storage.documents import LocalDocumentStorage
 
-_MODELS = (AIInteraction, Attempt, Document, Exam, ExamTopic, Mastery, Question, Subject, Topic)
+_MODELS = (
+    AIInteraction,
+    Attempt,
+    Document,
+    DocumentChunk,
+    Exam,
+    ExamTopic,
+    Mastery,
+    Question,
+    Subject,
+    Topic,
+)
 test_database_url = get_settings().database_url
 test_database_name = make_url(test_database_url).database or ""
 if not test_database_name.endswith("_test"):
@@ -99,6 +112,7 @@ async def async_client(
 
     fastapi_app.dependency_overrides[get_session] = override_session
     fastapi_app.dependency_overrides[get_document_storage] = lambda: document_storage
+    fastapi_app.dependency_overrides[get_embedding_provider] = lambda: FakeEmbeddingProvider()
     async with AsyncClient(
         transport=ASGITransport(app=fastapi_app), base_url="http://test"
     ) as client:

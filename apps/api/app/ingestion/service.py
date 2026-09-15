@@ -10,10 +10,17 @@ from fastapi import status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import ApplicationError
+from app.embeddings.contracts import (
+    EmbeddingDimensionMismatchError,
+    EmbeddingError,
+    EmbeddingUnavailableError,
+)
+from app.embeddings.service import EmbeddingService
 from app.ingestion.chunking import ChunkingError, DocumentChunker, ProcessedChunk
 from app.ingestion.extraction import DocumentExtractor, ExtractedPage, TextExtractionError
 from app.ingestion.normalization import TextNormalizer
 from app.models.document import Document, DocumentStatus
+from app.repositories.document_chunks import DocumentChunkRepository
 from app.repositories.documents import DocumentRepository
 from app.storage.documents import DocumentStorage, DocumentStorageError
 
@@ -39,13 +46,16 @@ class IngestionService:
         extractor: DocumentExtractor,
         normalizer: TextNormalizer,
         chunker: DocumentChunker,
+        embeddings: EmbeddingService,
     ) -> None:
         self.session = session
         self.storage = storage
         self.extractor = extractor
         self.normalizer = normalizer
         self.chunker = chunker
+        self.embeddings = embeddings
         self.documents = DocumentRepository(session)
+        self.document_chunks = DocumentChunkRepository(session)
 
     def ingest(self, source: BinaryIO) -> ProcessedDocument:
         extracted = self.extractor.extract(source)
@@ -92,10 +102,38 @@ class IngestionService:
             await self._fail(document_id, "PROCESSING_FAILED")
             raise ApplicationError(500, "PROCESSING_FAILED", "Document processing failed") from exc
 
-        document = await self.documents.finish_processing(
-            document_id, status=DocumentStatus.READY.value, error_code=None
-        )
-        await self.session.commit()
+        try:
+            vectors = await self.embeddings.embed([chunk.text for chunk in result.chunks])
+        except EmbeddingUnavailableError as exc:
+            await self._fail(document_id, exc.code)
+            raise ApplicationError(
+                503, exc.code, "Embedding service is temporarily unavailable"
+            ) from exc
+        except EmbeddingDimensionMismatchError as exc:
+            await self._fail(document_id, exc.code)
+            raise ApplicationError(500, exc.code, "Embedding dimensions are invalid") from exc
+        except EmbeddingError as exc:
+            await self._fail(document_id, exc.code)
+            raise ApplicationError(502, exc.code, "Embedding generation failed") from exc
+
+        try:
+            await self.document_chunks.replace(document_id, result.chunks, vectors)
+            document = await self.documents.publish_ready(
+                document_id,
+                embedding_provider=self.embeddings.provider.provider_name,
+                embedding_model=self.embeddings.provider.model_name,
+                embedding_dimensions=self.embeddings.dimensions,
+            )
+            await self.session.commit()
+        except Exception as exc:
+            await self.session.rollback()
+            logger.error(
+                "Document publication failed document_id=%s exception_class=%s",
+                document_id,
+                type(exc).__name__,
+            )
+            await self._fail(document_id, "PROCESSING_FAILED")
+            raise ApplicationError(500, "PROCESSING_FAILED", "Document processing failed") from exc
         logger.info(
             "Document processing completed document_id=%s page_count=%s chunk_count=%s",
             document_id,
@@ -109,6 +147,8 @@ class IngestionService:
             return self.ingest(source)
 
     async def _fail(self, document_id: uuid.UUID, error_code: str) -> None:
+        await self.session.rollback()
+        await self.document_chunks.delete_for_document(document_id)
         await self.documents.finish_processing(
             document_id, status=DocumentStatus.FAILED.value, error_code=error_code
         )

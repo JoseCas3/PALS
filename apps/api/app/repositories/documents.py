@@ -1,9 +1,10 @@
 import uuid
 
-from sqlalchemy import select, update
+from sqlalchemy import exists, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.document import Document
+from app.models.document_chunk import DocumentChunk
 
 
 class DocumentRepository:
@@ -40,16 +41,56 @@ class DocumentRepository:
         return document
 
     async def claim_processing(self, document_id: uuid.UUID) -> Document | None:
+        has_chunks = exists(
+            select(DocumentChunk.id).where(DocumentChunk.document_id == Document.id)
+        )
         result = await self.session.scalars(
             update(Document)
             .where(
                 Document.id == document_id,
-                Document.status.in_(("UPLOADED", "FAILED")),
+                (
+                    Document.status.in_(("UPLOADED", "FAILED"))
+                    | (
+                        (Document.status == "READY")
+                        & Document.embedding_provider.is_(None)
+                        & Document.embedding_model.is_(None)
+                        & Document.embedding_dimensions.is_(None)
+                        & ~has_chunks
+                    )
+                ),
             )
-            .values(status="PROCESSING", error_code=None)
+            .values(
+                status="PROCESSING",
+                error_code=None,
+                embedding_provider=None,
+                embedding_model=None,
+                embedding_dimensions=None,
+            )
             .returning(Document)
         )
         return result.one_or_none()
+
+    async def publish_ready(
+        self,
+        document_id: uuid.UUID,
+        *,
+        embedding_provider: str,
+        embedding_model: str,
+        embedding_dimensions: int,
+    ) -> Document:
+        result = await self.session.scalars(
+            update(Document)
+            .where(Document.id == document_id, Document.status == "PROCESSING")
+            .values(
+                status="READY",
+                error_code=None,
+                embedding_provider=embedding_provider,
+                embedding_model=embedding_model,
+                embedding_dimensions=embedding_dimensions,
+            )
+            .returning(Document)
+        )
+        return result.one()
 
     async def finish_processing(
         self, document_id: uuid.UUID, *, status: str, error_code: str | None

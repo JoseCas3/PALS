@@ -7,9 +7,11 @@ from app.api.dependencies import (
     DocumentExtractorDependency,
     DocumentMaxSizeDependency,
     DocumentStorageDependency,
+    EmbeddingProviderDependency,
     Session,
 )
 from app.core.config import get_settings
+from app.embeddings.service import EmbeddingService
 from app.ingestion.chunking import DocumentChunker
 from app.ingestion.normalization import TextNormalizer
 from app.ingestion.service import IngestionService
@@ -25,6 +27,7 @@ async def process_document(
     session: Session,
     storage: DocumentStorageDependency,
     extractor: DocumentExtractorDependency,
+    embedding_provider: EmbeddingProviderDependency,
 ) -> DocumentResponse:
     settings = get_settings()
     document = await IngestionService(
@@ -35,6 +38,11 @@ async def process_document(
         DocumentChunker(
             settings.rag_chunk_target_tokens,
             settings.rag_chunk_overlap_tokens,
+        ),
+        EmbeddingService(
+            embedding_provider,
+            batch_size=settings.embedding_batch_size,
+            dimensions=settings.embedding_dimensions,
         ),
     ).process(document_id)
     return DocumentResponse.model_validate(document)

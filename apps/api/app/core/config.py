@@ -22,11 +22,23 @@ class Settings(BaseSettings):
     document_max_size_bytes: int = Field(default=25 * 1024 * 1024, gt=0)
     rag_chunk_target_tokens: int = Field(default=800, gt=0)
     rag_chunk_overlap_tokens: int = Field(default=120, ge=0)
+    embedding_provider: str = "openai"
+    embedding_model: str = "text-embedding-3-small"
+    embedding_dimensions: int = 1536
+    embedding_batch_size: int = Field(default=64, gt=0)
 
     @model_validator(mode="after")
     def validate_chunk_configuration(self) -> Settings:
         if self.rag_chunk_overlap_tokens >= self.rag_chunk_target_tokens:
             raise ValueError("RAG chunk overlap must be smaller than the target")
+        self.embedding_provider = self.embedding_provider.strip().lower()
+        if self.embedding_provider not in {"openai", "fake"}:
+            raise ValueError("Embedding provider must be 'openai' or 'fake'")
+        self.embedding_model = self.embedding_model.strip()
+        if not self.embedding_model:
+            raise ValueError("Embedding model must not be empty")
+        if self.embedding_dimensions != 1536:
+            raise ValueError("Embedding dimensions must be 1536 for the current schema")
         return self
 
     @property

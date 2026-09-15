@@ -12,6 +12,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.dependencies import get_document_extractor, get_document_storage
 from app.core.config import Settings
 from app.core.errors import ApplicationError
+from app.embeddings.fake import FakeEmbeddingProvider
+from app.embeddings.service import EmbeddingService
 from app.ingestion.chunking import (
     ChunkingError,
     DocumentChunker,
@@ -28,15 +30,19 @@ from app.ingestion.extraction import (
 from app.ingestion.normalization import TextNormalizer
 from app.ingestion.service import IngestionService
 from app.main import app as fastapi_app
+from app.models.ai_interaction import AIInteraction
 from app.models.attempt import Attempt
 from app.models.document import Document
+from app.models.document_chunk import DocumentChunk
+from app.models.exam import Exam
+from app.models.exam_topic import ExamTopic
 from app.models.mastery import Mastery
 from app.models.question import Question
 from app.storage.documents import DocumentStorage, DocumentStorageError, LocalDocumentStorage
 from tests.pdf_factory import make_pdf
 from tests.test_attempts import ATTEMPT
 from tests.test_documents import upload_document
-from tests.test_exam_topics import create_topic
+from tests.test_exam_topics import create_exam, create_topic
 from tests.test_questions import create_question
 from tests.test_subjects import create_subject
 
@@ -141,6 +147,14 @@ def test_invalid_chunk_configuration_is_rejected(target: int, overlap: int) -> N
 def test_settings_reject_overlap_not_smaller_than_target() -> None:
     with pytest.raises(ValueError, match="overlap"):
         Settings(rag_chunk_target_tokens=10, rag_chunk_overlap_tokens=10)
+    with pytest.raises(ValueError, match="dimensions"):
+        Settings(embedding_dimensions=3072)
+    with pytest.raises(ValueError, match="provider"):
+        Settings(embedding_provider="unsupported")
+    with pytest.raises(ValueError, match="model"):
+        Settings(embedding_model=" ")
+    with pytest.raises(ValueError):
+        Settings(embedding_batch_size=0)
 
 
 class StaticExtractor(DocumentExtractor):
@@ -171,7 +185,7 @@ async def process_document(client: AsyncClient, document_id: object) -> Response
 
 
 @pytest.mark.asyncio
-async def test_process_uploaded_document_to_ready_without_persisting_derived_text(
+async def test_process_uploaded_document_publishes_chunks_without_exposing_text(
     async_client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
@@ -187,11 +201,26 @@ async def test_process_uploaded_document_to_ready_without_persisting_derived_tex
     assert response.status_code == 200
     assert response.json()["status"] == "READY"
     assert response.json()["error_code"] is None
+    assert response.json()["embedding_provider"] == "fake"
+    assert response.json()["embedding_model"] == "fake-deterministic-v1"
+    assert response.json()["embedding_dimensions"] == 1536
     assert "text" not in response.json()
     assert "chunks" not in response.json()
     document = await db_session.get(Document, uuid.UUID(str(uploaded["id"])))
     assert document is not None and document.status == "READY"
-    assert "document_chunks" not in document.metadata.tables
+    chunks = list(
+        await db_session.scalars(
+            select(DocumentChunk)
+            .where(DocumentChunk.document_id == document.id)
+            .order_by(DocumentChunk.chunk_index)
+        )
+    )
+    assert len(chunks) == 1
+    assert chunks[0].text == "This synthetic PDF has enough deterministic text for processing."
+    assert len(chunks[0].embedding) == 1536
+    assert document.embedding_provider == "fake"
+    assert document.embedding_model == "fake-deterministic-v1"
+    assert document.embedding_dimensions == 1536
     assert not hasattr(document, "text")
     assert not hasattr(document, "chunks")
 
@@ -262,6 +291,7 @@ async def test_chunking_failure_persists_safe_error(
         StaticExtractor(),
         TextNormalizer(),
         FailingChunker(10, 1),
+        EmbeddingService(FakeEmbeddingProvider(), batch_size=64, dimensions=1536),
     )
 
     with pytest.raises(ApplicationError) as raised:
@@ -288,6 +318,10 @@ async def test_unprocessable_lifecycle_states_are_rejected(
     document = await db_session.get(Document, uuid.UUID(str(uploaded["id"])))
     assert document is not None
     document.status = source_status
+    if source_status == "READY":
+        document.embedding_provider = "fake"
+        document.embedding_model = "fake-deterministic-v1"
+        document.embedding_dimensions = 1536
     await db_session.flush()
 
     response = await process_document(async_client, uploaded["id"])
@@ -337,6 +371,11 @@ async def test_processing_does_not_touch_academic_evidence(
 ) -> None:
     subject = await create_subject(async_client)
     topic = await create_topic(async_client, subject["id"], "Limits")
+    exam = await create_exam(async_client, subject["id"])
+    assigned = await async_client.put(
+        f"/api/v1/exams/{exam['id']}/topics/{topic['id']}", json={"weight": 0.5}
+    )
+    assert assigned.status_code == 200
     question = await create_question(async_client, topic["id"])
     attempt = await async_client.post(f"/api/v1/questions/{question['id']}/attempts", json=ATTEMPT)
     assert attempt.status_code == 201
@@ -351,6 +390,9 @@ async def test_processing_does_not_touch_academic_evidence(
     assert response.status_code == 200
     assert await db_session.scalar(select(func.count()).select_from(Question)) == 1
     assert await db_session.scalar(select(func.count()).select_from(Attempt)) == 1
+    assert await db_session.scalar(select(func.count()).select_from(Exam)) == 1
+    assert await db_session.scalar(select(func.count()).select_from(ExamTopic)) == 1
+    assert await db_session.scalar(select(func.count()).select_from(AIInteraction)) == 0
     await db_session.refresh(mastery_before)
     assert mastery_before.score == score_before
 
