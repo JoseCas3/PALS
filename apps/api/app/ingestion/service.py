@@ -115,6 +115,16 @@ class IngestionService:
         except EmbeddingError as exc:
             await self._fail(document_id, exc.code)
             raise ApplicationError(502, exc.code, "Embedding generation failed") from exc
+        except Exception as exc:
+            logger.error(
+                "Embedding generation failed document_id=%s exception_class=%s",
+                document_id,
+                type(exc).__name__,
+            )
+            await self._fail(document_id, "EMBEDDING_FAILED")
+            raise ApplicationError(
+                502, "EMBEDDING_FAILED", "Embedding generation failed"
+            ) from exc
 
         try:
             await self.document_chunks.replace(document_id, result.chunks, vectors)

@@ -115,6 +115,33 @@ async def test_wrong_dimensions_fail_safely_without_partial_chunks(
 
 
 @pytest.mark.asyncio
+async def test_unexpected_embedding_stage_failure_marks_document_failed(
+    async_client: AsyncClient,
+    db_session: AsyncSession,
+    document_storage: LocalDocumentStorage,
+) -> None:
+    subject = await create_subject(async_client)
+    uploaded = await upload_document(async_client, subject["id"])
+    document_id = uuid.UUID(str(uploaded["id"]))
+
+    class UnexpectedProvider(FakeEmbeddingProvider):
+        async def embed(self, texts: Sequence[str]) -> Sequence[ProviderEmbedding]:
+            raise RuntimeError("private provider payload")
+
+    with pytest.raises(ApplicationError) as raised:
+        await publication_service(
+            db_session, document_storage, UnexpectedProvider()
+        ).process(document_id)
+
+    document = await db_session.get(Document, document_id)
+    assert raised.value.code == "EMBEDDING_FAILED"
+    assert "private" not in raised.value.message
+    assert document is not None and document.status == "FAILED"
+    assert document.error_code == "EMBEDDING_FAILED"
+    assert await chunk_count(db_session, document_id) == 0
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("failure_point", ["chunks", "ready"])
 async def test_publication_insert_or_ready_failure_rolls_back_every_chunk(
     async_client: AsyncClient,
@@ -316,6 +343,37 @@ async def test_document_delete_cascades_chunks_and_removes_pdf(
     deleted = await async_client.delete(f"/api/v1/documents/{document_id}")
 
     assert deleted.status_code == 204
-    assert await db_session.get(Document, document_id) is None
+    assert await db_session.scalar(
+        select(func.count()).select_from(Document).where(Document.id == document_id)
+    ) == 0
+    assert await chunk_count(db_session, document_id) == 0
+    assert not document_storage.exists(storage_key)
+
+
+@pytest.mark.asyncio
+async def test_subject_delete_cascades_chunks_and_removes_pdf(
+    async_client: AsyncClient,
+    db_session: AsyncSession,
+    document_storage: LocalDocumentStorage,
+) -> None:
+    subject = await create_subject(async_client)
+    uploaded = await upload_document(
+        async_client,
+        subject["id"],
+        content=make_pdf(["Subject cascade has enough deterministic text for processing."]),
+    )
+    document_id = uuid.UUID(str(uploaded["id"]))
+    assert (await process_document(async_client, document_id)).status_code == 200
+    document = await db_session.get(Document, document_id)
+    assert document is not None
+    storage_key = document.storage_key
+    assert await chunk_count(db_session, document_id) > 0
+
+    deleted = await async_client.delete(f"/api/v1/subjects/{subject['id']}")
+
+    assert deleted.status_code == 204
+    assert await db_session.scalar(
+        select(func.count()).select_from(Document).where(Document.id == document_id)
+    ) == 0
     assert await chunk_count(db_session, document_id) == 0
     assert not document_storage.exists(storage_key)

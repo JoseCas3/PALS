@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import logging
 import uuid
 from contextlib import suppress
 
@@ -13,7 +14,9 @@ from app.core.errors import ApplicationError
 from app.models.document import Document, DocumentStatus
 from app.repositories.documents import DocumentRepository
 from app.repositories.subjects import SubjectRepository
-from app.storage.documents import DocumentStorage, DocumentStorageError
+from app.storage.documents import DocumentStorage, DocumentStorageError, StagedDocumentDeletion
+
+logger = logging.getLogger(__name__)
 
 
 class DocumentService:
@@ -100,13 +103,19 @@ class DocumentService:
     async def delete(self, document_id: uuid.UUID) -> None:
         document = await self.get(document_id)
         try:
-            await asyncio.to_thread(self.storage.delete, document.storage_key)
+            staged = await asyncio.to_thread(self.storage.stage_delete, document.storage_key)
         except DocumentStorageError as exc:
             raise ApplicationError(
                 500, "DOCUMENT_STORAGE_ERROR", "Document storage operation failed"
             ) from exc
-        await self.documents.delete(document)
-        await self.session.commit()
+        try:
+            await self.documents.delete(document)
+            await self.session.commit()
+        except Exception:
+            await self.session.rollback()
+            await self._restore_delete(staged)
+            raise
+        await self._finalize_delete(staged)
 
     async def _require_subject(self, subject_id: uuid.UUID) -> None:
         if await self.subjects.get(subject_id) is None:
@@ -135,3 +144,18 @@ class DocumentService:
     async def _best_effort_delete(self, storage_key: str) -> None:
         with suppress(DocumentStorageError):
             await asyncio.to_thread(self.storage.delete, storage_key)
+
+    async def _restore_delete(self, staged: StagedDocumentDeletion) -> None:
+        try:
+            await asyncio.to_thread(self.storage.restore_delete, staged)
+        except DocumentStorageError as exc:
+            logger.error("Document delete restoration failed")
+            raise ApplicationError(
+                500, "DOCUMENT_STORAGE_ERROR", "Document storage operation failed"
+            ) from exc
+
+    async def _finalize_delete(self, staged: StagedDocumentDeletion) -> None:
+        try:
+            await asyncio.to_thread(self.storage.finalize_delete, staged)
+        except DocumentStorageError:
+            logger.warning("Document delete finalization left a staged orphan")

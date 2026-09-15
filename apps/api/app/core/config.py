@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     embedding_model: str = "text-embedding-3-small"
     embedding_dimensions: int = 1536
     embedding_batch_size: int = Field(default=64, gt=0)
+    retrieval_top_k: int = Field(default=8, gt=0, le=50)
+    retrieval_max_limit: int = Field(default=50, gt=0, le=50)
+    retrieval_min_relevance: float = Field(default=0.0, ge=-1.0, le=1.0)
 
     @model_validator(mode="after")
     def validate_chunk_configuration(self) -> Settings:
@@ -39,6 +42,8 @@ class Settings(BaseSettings):
             raise ValueError("Embedding model must not be empty")
         if self.embedding_dimensions != 1536:
             raise ValueError("Embedding dimensions must be 1536 for the current schema")
+        if self.retrieval_top_k > self.retrieval_max_limit:
+            raise ValueError("Retrieval top-k must not exceed the maximum limit")
         return self
 
     @property

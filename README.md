@@ -111,7 +111,9 @@ R2 processing uses `RAG_CHUNK_TARGET_TOKENS` (800 by default) and
 `RAG_CHUNK_OVERLAP_TOKENS` (120 by default) for deterministic chunks. R3 publishes those chunks
 with embeddings to PostgreSQL pgvector. The active profile defaults to OpenAI
 `text-embedding-3-small`, 1,536 dimensions, and batches of 64; tests and E2E use the deterministic
-fake provider and never require a key or network call.
+fake provider. R4 adds internal Subject-scoped exact-cosine retrieval configured by
+`RETRIEVAL_TOP_K` (8), `RETRIEVAL_MAX_LIMIT` (50), and `RETRIEVAL_MIN_RELEVANCE` (0.0). The initial
+threshold is engineering plumbing, not production semantic calibration.
 
 ## Sprint 1 domain core
 
@@ -221,6 +223,7 @@ npm run test:e2e
 
 R1 adds Subject-owned PDF Documents with PostgreSQL metadata and opaque-key local filesystem
 storage. R2 adds explicit deterministic PDF extraction and page-aware chunking. R3 adds a separate
-embedding boundary, pgvector 0.8.6, persistent `DocumentChunk` rows, and atomic retrieval-ready
-publication. Retrieval, grounding, and citations remain deferred. See `docs/RAG_R1.md`,
-`docs/RAG_R2.md`, `docs/RAG_R3.md`, and `docs/RAG_ARCHITECTURE.md`.
+embedding boundary, pgvector 0.8.6, persistent `DocumentChunk` rows, atomic retrieval-ready
+publication, and an internal R4 Retrieval Service awaiting independent review. Grounding and
+citations remain deferred. See `docs/RAG_R1.md`, `docs/RAG_R2.md`, `docs/RAG_R3.md`,
+`docs/RAG_R4.md`, and `docs/RAG_ARCHITECTURE.md`.

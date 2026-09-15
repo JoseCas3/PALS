@@ -1,4 +1,6 @@
 import asyncio
+import builtins
+import logging
 import uuid
 
 from fastapi import status
@@ -10,7 +12,9 @@ from app.models.subject import Subject
 from app.repositories.documents import DocumentRepository
 from app.repositories.subjects import SubjectRepository
 from app.schemas.subject import SubjectCreate, SubjectUpdate
-from app.storage.documents import DocumentStorage, DocumentStorageError
+from app.storage.documents import DocumentStorage, DocumentStorageError, StagedDocumentDeletion
+
+logger = logging.getLogger(__name__)
 
 
 class SubjectService:
@@ -59,6 +63,7 @@ class SubjectService:
             )
         documents = await self.documents.list_for_subject(subject_id)
         storage = self.storage
+        staged: builtins.list[StagedDocumentDeletion] = []
         if documents:
             if storage is None:
                 raise RuntimeError(
@@ -66,8 +71,11 @@ class SubjectService:
                 )
             try:
                 for document in documents:
-                    await asyncio.to_thread(storage.delete, document.storage_key)
+                    staged.append(
+                        await asyncio.to_thread(storage.stage_delete, document.storage_key)
+                    )
             except DocumentStorageError as exc:
+                await self._restore_staged(storage, staged)
                 raise ApplicationError(
                     500, "DOCUMENT_STORAGE_ERROR", "Document storage operation failed"
                 ) from exc
@@ -76,6 +84,38 @@ class SubjectService:
             await self.session.commit()
         except IntegrityError as exc:
             await self.session.rollback()
+            if storage is not None:
+                await self._restore_staged(storage, staged)
             raise ApplicationError(
                 409, "SUBJECT_DELETE_CONFLICT", "Subject is still referenced"
             ) from exc
+        except Exception:
+            await self.session.rollback()
+            if storage is not None:
+                await self._restore_staged(storage, staged)
+            raise
+        if storage is not None:
+            await self._finalize_staged(storage, staged)
+
+    @staticmethod
+    async def _restore_staged(
+        storage: DocumentStorage, staged: builtins.list[StagedDocumentDeletion]
+    ) -> None:
+        try:
+            for deletion in reversed(staged):
+                await asyncio.to_thread(storage.restore_delete, deletion)
+        except DocumentStorageError as exc:
+            logger.error("Subject document delete restoration failed")
+            raise ApplicationError(
+                500, "DOCUMENT_STORAGE_ERROR", "Document storage operation failed"
+            ) from exc
+
+    @staticmethod
+    async def _finalize_staged(
+        storage: DocumentStorage, staged: builtins.list[StagedDocumentDeletion]
+    ) -> None:
+        for deletion in staged:
+            try:
+                await asyncio.to_thread(storage.finalize_delete, deletion)
+            except DocumentStorageError:
+                logger.warning("Subject delete finalization left a staged orphan")

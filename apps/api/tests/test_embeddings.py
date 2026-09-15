@@ -119,3 +119,53 @@ async def test_openai_provider_without_key_fails_only_when_embedding_is_requeste
 
     with pytest.raises(EmbeddingUnavailableError):
         await provider.embed(["safe"])
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "response",
+    [
+        SimpleNamespace(),
+        SimpleNamespace(data=None),
+        SimpleNamespace(data=[SimpleNamespace(index=0)]),
+        SimpleNamespace(data=[SimpleNamespace(index=0, embedding=None)]),
+    ],
+)
+async def test_openai_malformed_response_maps_to_safe_embedding_failure(
+    response: object,
+) -> None:
+    class Embeddings:
+        async def create(self, **_: object) -> object:
+            return response
+
+    provider = OpenAIEmbeddingProvider(
+        api_key="unused",
+        model_name="text-embedding-3-small",
+        dimensions=1536,
+        timeout_seconds=20,
+        client=SimpleNamespace(embeddings=Embeddings()),
+    )
+
+    with pytest.raises(EmbeddingError, match="invalid response") as raised:
+        await provider.embed(["private query"])
+    assert "private query" not in str(raised.value)
+
+
+@pytest.mark.asyncio
+async def test_openai_unexpected_client_failure_maps_to_embedding_failed() -> None:
+    class Embeddings:
+        async def create(self, **_: object) -> object:
+            raise RuntimeError("private provider payload")
+
+    provider = OpenAIEmbeddingProvider(
+        api_key="unused",
+        model_name="text-embedding-3-small",
+        dimensions=1536,
+        timeout_seconds=20,
+        client=SimpleNamespace(embeddings=Embeddings()),
+    )
+
+    with pytest.raises(EmbeddingError) as raised:
+        await provider.embed(["private document text"])
+    assert str(raised.value) == "Embedding provider failed"
+    assert "private" not in str(raised.value)

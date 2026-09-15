@@ -53,10 +53,15 @@ class OpenAIEmbeddingProvider:
             raise EmbeddingError("Embedding provider rejected the request") from exc
         except openai.OpenAIError as exc:
             raise EmbeddingError("Embedding provider failed") from exc
-        return [
-            ProviderEmbedding(index=item.index, vector=tuple(item.embedding))
-            for item in response.data
-        ]
+        except Exception as exc:
+            raise EmbeddingError("Embedding provider failed") from exc
+        try:
+            return [
+                ProviderEmbedding(index=item.index, vector=tuple(item.embedding))
+                for item in response.data
+            ]
+        except Exception as exc:
+            raise EmbeddingError("Embedding provider returned an invalid response") from exc
 
     async def aclose(self) -> None:
         if self._client is not None:

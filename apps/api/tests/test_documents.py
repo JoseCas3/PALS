@@ -10,12 +10,20 @@ from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies import get_document_max_size_bytes, get_document_storage
+from app.core.errors import ApplicationError
 from app.main import app as fastapi_app
 from app.models.attempt import Attempt
 from app.models.document import Document
 from app.models.mastery import Mastery
 from app.repositories.documents import DocumentRepository
-from app.storage.documents import DocumentStorage, DocumentStorageError, LocalDocumentStorage
+from app.services.documents import DocumentService
+from app.services.subjects import SubjectService
+from app.storage.documents import (
+    DocumentStorage,
+    DocumentStorageError,
+    LocalDocumentStorage,
+    StagedDocumentDeletion,
+)
 from tests.test_attempts import ATTEMPT
 from tests.test_exam_topics import create_topic
 from tests.test_questions import create_question
@@ -297,6 +305,15 @@ class FailingStorage(DocumentStorage):
     def exists(self, storage_key: str) -> bool:
         return False
 
+    def stage_delete(self, storage_key: str) -> StagedDocumentDeletion:
+        raise NotImplementedError
+
+    def restore_delete(self, staged: StagedDocumentDeletion) -> None:
+        raise NotImplementedError
+
+    def finalize_delete(self, staged: StagedDocumentDeletion) -> None:
+        raise NotImplementedError
+
 
 @pytest.mark.asyncio
 async def test_storage_failure_creates_no_row_and_returns_safe_error(
@@ -316,3 +333,92 @@ async def test_storage_failure_creates_no_row_and_returns_safe_error(
     assert response.json()["error"]["code"] == "DOCUMENT_STORAGE_ERROR"
     assert "private" not in response.text
     assert await db_session.scalar(select(func.count()).select_from(Document)) == 0
+
+
+@pytest.mark.asyncio
+async def test_document_delete_commit_failure_restores_pdf_and_metadata(
+    async_client: AsyncClient,
+    db_session: AsyncSession,
+    document_storage: LocalDocumentStorage,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    subject = await create_subject(async_client)
+    uploaded = await upload_document(async_client, subject["id"])
+    document_id = uuid.UUID(str(uploaded["id"]))
+    document = await db_session.get(Document, document_id)
+    assert document is not None
+    storage_key = document.storage_key
+
+    async def fail_commit() -> None:
+        raise RuntimeError("private database failure")
+
+    monkeypatch.setattr(db_session, "commit", fail_commit)
+    with pytest.raises(RuntimeError):
+        await DocumentService(db_session, document_storage).delete(document_id)
+
+    assert document_storage.exists(storage_key)
+    assert await db_session.get(Document, document_id) is not None
+
+
+@pytest.mark.asyncio
+async def test_subject_delete_partial_staging_failure_restores_every_pdf(
+    async_client: AsyncClient,
+    db_session: AsyncSession,
+    document_storage: LocalDocumentStorage,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    subject = await create_subject(async_client)
+    first = await upload_document(async_client, subject["id"], content=PDF)
+    second = await upload_document(async_client, subject["id"], content=OTHER_PDF)
+    documents = [
+        await db_session.get(Document, uuid.UUID(str(item["id"])))
+        for item in (first, second)
+    ]
+    assert all(document is not None for document in documents)
+    storage_keys = [document.storage_key for document in documents if document is not None]
+    real_stage = document_storage.stage_delete
+    calls = 0
+
+    def fail_second(storage_key: str) -> object:
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise DocumentStorageError("private staging failure")
+        return real_stage(storage_key)
+
+    monkeypatch.setattr(document_storage, "stage_delete", fail_second)
+    with pytest.raises(ApplicationError) as raised:
+        await SubjectService(db_session, document_storage).delete(
+            uuid.UUID(str(subject["id"]))
+        )
+
+    assert raised.value.code == "DOCUMENT_STORAGE_ERROR"
+    assert all(document_storage.exists(key) for key in storage_keys)
+    assert await db_session.scalar(select(func.count()).select_from(Document)) == 2
+
+
+@pytest.mark.asyncio
+async def test_subject_delete_commit_failure_restores_all_pdfs(
+    async_client: AsyncClient,
+    db_session: AsyncSession,
+    document_storage: LocalDocumentStorage,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    subject = await create_subject(async_client)
+    uploaded = await upload_document(async_client, subject["id"])
+    document = await db_session.get(Document, uuid.UUID(str(uploaded["id"])))
+    assert document is not None
+    document_id = document.id
+    storage_key = document.storage_key
+
+    async def fail_commit() -> None:
+        raise RuntimeError("private database failure")
+
+    monkeypatch.setattr(db_session, "commit", fail_commit)
+    with pytest.raises(RuntimeError):
+        await SubjectService(db_session, document_storage).delete(
+            uuid.UUID(str(subject["id"]))
+        )
+
+    assert document_storage.exists(storage_key)
+    assert await db_session.get(Document, document_id) is not None

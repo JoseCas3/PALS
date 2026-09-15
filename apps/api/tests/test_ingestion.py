@@ -38,7 +38,12 @@ from app.models.exam import Exam
 from app.models.exam_topic import ExamTopic
 from app.models.mastery import Mastery
 from app.models.question import Question
-from app.storage.documents import DocumentStorage, DocumentStorageError, LocalDocumentStorage
+from app.storage.documents import (
+    DocumentStorage,
+    DocumentStorageError,
+    LocalDocumentStorage,
+    StagedDocumentDeletion,
+)
 from tests.pdf_factory import make_pdf
 from tests.test_attempts import ATTEMPT
 from tests.test_documents import upload_document
@@ -155,6 +160,14 @@ def test_settings_reject_overlap_not_smaller_than_target() -> None:
         Settings(embedding_model=" ")
     with pytest.raises(ValueError):
         Settings(embedding_batch_size=0)
+    with pytest.raises(ValueError):
+        Settings(retrieval_top_k=0)
+    with pytest.raises(ValueError):
+        Settings(retrieval_max_limit=51)
+    with pytest.raises(ValueError):
+        Settings(retrieval_top_k=9, retrieval_max_limit=8)
+    with pytest.raises(ValueError):
+        Settings(retrieval_min_relevance=1.1)
 
 
 class StaticExtractor(DocumentExtractor):
@@ -342,6 +355,15 @@ class ReadFailingStorage(DocumentStorage):
 
     def exists(self, storage_key: str) -> bool:
         return True
+
+    def stage_delete(self, storage_key: str) -> StagedDocumentDeletion:
+        raise NotImplementedError
+
+    def restore_delete(self, staged: StagedDocumentDeletion) -> None:
+        raise NotImplementedError
+
+    def finalize_delete(self, staged: StagedDocumentDeletion) -> None:
+        raise NotImplementedError
 
 
 @pytest.mark.asyncio
