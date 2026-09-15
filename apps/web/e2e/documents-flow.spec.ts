@@ -1,10 +1,9 @@
-import path from "node:path";
-
 import { expect, test } from "@playwright/test";
 
-test("persists and deletes a Subject PDF without AI", async ({ page }) => {
-  const subjectName = "R1 Document Subject";
-  const fixture = path.resolve(__dirname, "fixtures/r1-synthetic.pdf");
+import { syntheticPdf } from "./pdf-fixtures";
+
+test("processes text and safely rejects insufficient PDFs without AI", async ({ page }) => {
+  const subjectName = "R2 Ingestion Subject";
 
   await page.goto("/");
   await expect(page.getByText("API connected")).toBeVisible();
@@ -15,17 +14,41 @@ test("persists and deletes a Subject PDF without AI", async ({ page }) => {
     .toHaveAttribute("aria-pressed", "true");
 
   const documents = page.getByRole("region", { name: "Documents" });
-  await documents.getByLabel("Document PDF").setInputFiles(fixture);
+  await documents.getByLabel("Document PDF").setInputFiles({
+    name: "text-one-page.pdf",
+    mimeType: "application/pdf",
+    buffer: syntheticPdf([
+      "This synthetic course page contains enough deterministic text for local PDF processing.",
+    ]),
+  });
   await documents.getByRole("button", { name: "Upload PDF" }).click();
-  await expect(documents.getByText("r1-synthetic.pdf")).toBeVisible();
-  await expect(documents.getByText(/UPLOADED/)).toBeVisible();
+  const textDocument = documents.getByRole("listitem").filter({ hasText: "text-one-page.pdf" });
+  await expect(textDocument.getByText(/UPLOADED/)).toBeVisible();
+  await textDocument.getByRole("button", { name: "Process" }).click();
+  await expect(textDocument.getByText(/READY/)).toBeVisible();
 
   await page.reload();
   await page.getByRole("button", { name: new RegExp(subjectName) }).first().click();
-  await expect(documents.getByText("r1-synthetic.pdf")).toBeVisible();
+  await expect(documents.getByText("text-one-page.pdf")).toBeVisible();
+  await expect(documents.getByRole("listitem").filter({ hasText: "text-one-page.pdf" })
+    .getByText(/READY/)).toBeVisible();
+
+  await documents.getByLabel("Document PDF").setInputFiles({
+    name: "empty-text.pdf",
+    mimeType: "application/pdf",
+    buffer: syntheticPdf([""]),
+  });
+  await documents.getByRole("button", { name: "Upload PDF" }).click();
+  const emptyDocument = documents.getByRole("listitem").filter({ hasText: "empty-text.pdf" });
+  await emptyDocument.getByRole("button", { name: "Process" }).click();
+  await expect(emptyDocument.getByText(/OCR is not available yet/)).toBeVisible();
+  await expect(emptyDocument.getByRole("button", { name: "Retry" })).toBeVisible();
 
   page.once("dialog", (dialog) => dialog.accept());
-  await documents.getByRole("button", { name: "Delete" }).click();
-  await expect(documents.getByText("r1-synthetic.pdf")).not.toBeVisible();
+  await emptyDocument.getByRole("button", { name: "Delete" }).click();
+  await expect(documents.getByText("empty-text.pdf")).not.toBeVisible();
+  page.once("dialog", (dialog) => dialog.accept());
+  await textDocument.getByRole("button", { name: "Delete" }).click();
+  await expect(documents.getByText("text-one-page.pdf")).not.toBeVisible();
   await expect(documents.getByText("No Documents uploaded for this Subject.")).toBeVisible();
 });

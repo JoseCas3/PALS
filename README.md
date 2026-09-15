@@ -107,6 +107,8 @@ the web origins allowed to make local API requests.
 PDF uploads use persistent local storage. `DOCUMENT_STORAGE_ROOT` selects the storage root and
 `DOCUMENT_MAX_SIZE_BYTES` sets the upload limit (25 MiB by default). Docker Compose stores files
 in the named `document_data` volume, so normal container recreation does not remove them.
+R2 processing uses `RAG_CHUNK_TARGET_TOKENS` (800 by default) and
+`RAG_CHUNK_OVERLAP_TOKENS` (120 by default) for deterministic transient chunks.
 
 ## Sprint 1 domain core
 
@@ -215,6 +217,7 @@ npm run test:e2e
 ## Post-Alpha RAG R1 document domain
 
 R1 adds Subject-owned PDF Documents with PostgreSQL metadata and opaque-key local filesystem
-storage. Uploads are validated, fingerprinted with SHA-256, and created as `UPLOADED`; no text
-extraction, chunking, embeddings, retrieval, grounding, or citations are implemented. See
-`docs/RAG_R1.md` and `docs/RAG_ARCHITECTURE.md`.
+storage. Uploads are validated, fingerprinted with SHA-256, and created as `UPLOADED`; extraction
+does not occur during upload. R2 adds explicit local processing into transient page-aware chunks.
+Embeddings, retrieval, grounding, and citations remain unimplemented. See `docs/RAG_R1.md`,
+`docs/RAG_R2.md`, and `docs/RAG_ARCHITECTURE.md`.

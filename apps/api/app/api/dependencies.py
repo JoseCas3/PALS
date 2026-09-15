@@ -9,6 +9,7 @@ from app.ai.gateway import AIGateway
 from app.core.config import get_settings
 from app.core.errors import ApplicationError
 from app.db.session import async_session_factory
+from app.ingestion.extraction import DocumentExtractor, PypdfDocumentExtractor
 from app.storage.documents import DocumentStorage, LocalDocumentStorage
 
 
@@ -56,5 +57,10 @@ def get_document_max_size_bytes() -> int:
     return get_settings().document_max_size_bytes
 
 
+def get_document_extractor() -> DocumentExtractor:
+    return PypdfDocumentExtractor()
+
+
 DocumentStorageDependency = Annotated[DocumentStorage, Depends(get_document_storage)]
 DocumentMaxSizeDependency = Annotated[int, Depends(get_document_max_size_bytes)]
+DocumentExtractorDependency = Annotated[DocumentExtractor, Depends(get_document_extractor)]

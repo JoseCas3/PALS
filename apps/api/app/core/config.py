@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field, SecretStr
+from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -18,6 +20,14 @@ class Settings(BaseSettings):
     ai_timeout_seconds: float = Field(default=20.0, gt=0)
     document_storage_root: Path = Path("./data/documents")
     document_max_size_bytes: int = Field(default=25 * 1024 * 1024, gt=0)
+    rag_chunk_target_tokens: int = Field(default=800, gt=0)
+    rag_chunk_overlap_tokens: int = Field(default=120, ge=0)
+
+    @model_validator(mode="after")
+    def validate_chunk_configuration(self) -> Settings:
+        if self.rag_chunk_overlap_tokens >= self.rag_chunk_target_tokens:
+            raise ValueError("RAG chunk overlap must be smaller than the target")
+        return self
 
     @property
     def allowed_origins(self) -> list[str]:

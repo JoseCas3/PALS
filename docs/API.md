@@ -19,6 +19,8 @@ frontend; Practice selection and refresh revisions are in-memory UI concerns and
 - `GET /subjects/{subject_id}/documents` returns 200 with an oldest-first Subject-scoped list.
 - `GET /documents/{document_id}` returns 200 with public metadata.
 - `DELETE /documents/{document_id}` returns 204 after deleting the file and row.
+- `POST /documents/{document_id}/process` processes an `UPLOADED` or `FAILED` PDF and returns 200
+  with READY metadata, or a safe error after persisting FAILED.
 
 R1 accepts PDF files only. It validates extension, supplied MIME type, configured size limit, and
 the `%PDF-` signature before storing bytes under an opaque key. Responses never expose the storage
@@ -28,6 +30,11 @@ deletion also cleans associated Document files and cascades their metadata rows.
 
 Document errors use `UNSUPPORTED_FILE_TYPE`, `FILE_TOO_LARGE`, `INVALID_PDF`,
 `DOCUMENT_ALREADY_EXISTS`, `DOCUMENT_NOT_FOUND`, and `DOCUMENT_STORAGE_ERROR` as applicable.
+
+R2 processing may return `TEXT_EXTRACTION_FAILED`, `TEXT_EXTRACTION_INSUFFICIENT`,
+`CHUNKING_FAILED`, or `PROCESSING_FAILED`. PROCESSING and READY documents reject processing with
+`DOCUMENT_ALREADY_PROCESSING` and `DOCUMENT_ALREADY_PROCESSED`. Extracted text and transient chunks
+are never returned.
 
 ## Topics
 

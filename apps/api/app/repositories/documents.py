@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.document import Document
@@ -37,6 +37,30 @@ class DocumentRepository:
         self.session.add(document)
         await self.session.flush()
         await self.session.refresh(document)
+        return document
+
+    async def claim_processing(self, document_id: uuid.UUID) -> Document | None:
+        result = await self.session.scalars(
+            update(Document)
+            .where(
+                Document.id == document_id,
+                Document.status.in_(("UPLOADED", "FAILED")),
+            )
+            .values(status="PROCESSING", error_code=None)
+            .returning(Document)
+        )
+        return result.one_or_none()
+
+    async def finish_processing(
+        self, document_id: uuid.UUID, *, status: str, error_code: str | None
+    ) -> Document:
+        result = await self.session.scalars(
+            update(Document)
+            .where(Document.id == document_id, Document.status == "PROCESSING")
+            .values(status=status, error_code=error_code)
+            .returning(Document)
+        )
+        document = result.one()
         return document
 
     async def delete(self, document: Document) -> None:

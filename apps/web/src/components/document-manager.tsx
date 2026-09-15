@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
 
-import { api } from "../lib/api";
+import { ApiError, api } from "../lib/api";
 import type { Document } from "../lib/types";
 
 export function DocumentManager({ selectedSubjectId }: { selectedSubjectId: string }) {
@@ -11,12 +11,14 @@ export function DocumentManager({ selectedSubjectId }: { selectedSubjectId: stri
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [deletingId, setDeletingId] = useState("");
+  const [processingId, setProcessingId] = useState("");
   const [error, setError] = useState("");
   const fileInput = useRef<HTMLInputElement>(null);
   const activeSubjectId = useRef(selectedSubjectId);
   const contextRequest = useRef(0);
   const uploadRequest = useRef(0);
   const deleteRequest = useRef(0);
+  const processRequest = useRef(0);
 
   useLayoutEffect(() => {
     activeSubjectId.current = selectedSubjectId;
@@ -27,12 +29,14 @@ export function DocumentManager({ selectedSubjectId }: { selectedSubjectId: stri
     const request = ++contextRequest.current;
     uploadRequest.current += 1;
     deleteRequest.current += 1;
+    processRequest.current += 1;
     queueMicrotask(() => {
       if (!isActive(subjectId, request)) return;
       setDocuments([]);
       setFile(null);
       setUploading(false);
       setDeletingId("");
+      setProcessingId("");
       setError("");
       setLoading(Boolean(subjectId));
       if (fileInput.current) fileInput.current.value = "";
@@ -103,12 +107,42 @@ export function DocumentManager({ selectedSubjectId }: { selectedSubjectId: stri
     }
   }
 
+  async function processDocument(documentId: string) {
+    if (processingId) return;
+    const subjectId = selectedSubjectId;
+    const context = contextRequest.current;
+    const request = ++processRequest.current;
+    setProcessingId(documentId);
+    setError("");
+    setDocuments((items) => items.map((item) => item.id === documentId
+      ? { ...item, status: "PROCESSING", error_code: null }
+      : item));
+    try {
+      const processed = await api.processDocument(documentId);
+      if (request !== processRequest.current || !isActive(subjectId, context)) return;
+      setDocuments((items) => items.map((item) => item.id === documentId ? processed : item));
+    } catch (reason) {
+      if (request !== processRequest.current || !isActive(subjectId, context)) return;
+      const code = reason instanceof ApiError
+        ? reason.code ?? "PROCESSING_FAILED"
+        : "PROCESSING_FAILED";
+      setDocuments((items) => items.map((item) => item.id === documentId
+        ? { ...item, status: "FAILED", error_code: code }
+        : item));
+      setError(processFailureMessage(code));
+    } finally {
+      if (request === processRequest.current && isActive(subjectId, context)) {
+        setProcessingId("");
+      }
+    }
+  }
+
   return (
     <section className="panel space-y-5" aria-labelledby="documents-heading">
       <div>
         <p className="eyebrow">Subject resources</p>
         <h2 id="documents-heading">Documents</h2>
-        <p className="empty">PDF storage only. Processing and retrieval are not part of R1.</p>
+        <p className="empty">PDF extraction is local. Retrieval is not available yet.</p>
       </div>
 
       {error && <p role="alert" className="error-banner">{error}</p>}
@@ -124,9 +158,10 @@ export function DocumentManager({ selectedSubjectId }: { selectedSubjectId: stri
               type="file"
               accept="application/pdf,.pdf"
               required
+              disabled={Boolean(processingId)}
               onChange={(event) => setFile(event.target.files?.[0] ?? null)}
             />
-            <button type="submit" disabled={!file || uploading}>
+            <button type="submit" disabled={!file || uploading || Boolean(processingId)}>
               {uploading ? "Uploading…" : "Upload PDF"}
             </button>
           </form>
@@ -142,11 +177,26 @@ export function DocumentManager({ selectedSubjectId }: { selectedSubjectId: stri
                   <div className="item-main">
                     <strong>{document.original_filename}</strong>
                     <span>{document.status} · {formatBytes(document.size_bytes)}</span>
+                    {document.status === "FAILED" && (
+                      <span>{processFailureMessage(document.error_code)}</span>
+                    )}
                   </div>
+                  {(document.status === "UPLOADED" || document.status === "FAILED") && (
+                    <button
+                      type="button"
+                      disabled={Boolean(processingId) || Boolean(deletingId)}
+                      onClick={() => void processDocument(document.id)}
+                    >
+                      {processingId === document.id
+                        ? "Processing..."
+                        : document.status === "FAILED" ? "Retry" : "Process"}
+                    </button>
+                  )}
+                  {document.status === "PROCESSING" && <span>Processing...</span>}
                   <button
                     type="button"
                     className="danger"
-                    disabled={Boolean(deletingId)}
+                    disabled={Boolean(deletingId) || Boolean(processingId)}
                     onClick={() => void remove(document.id)}
                   >
                     {deletingId === document.id ? "Deleting…" : "Delete"}
@@ -168,4 +218,17 @@ function formatBytes(size: number): string {
 
 function errorMessage(reason: unknown): string {
   return reason instanceof Error ? reason.message : "Document operation failed";
+}
+
+function processFailureMessage(code: string | null | undefined): string {
+  if (code === "TEXT_EXTRACTION_INSUFFICIENT") {
+    return "Not enough extractable text. This PDF may be scanned or image-only; OCR is not available yet.";
+  }
+  if (code === "TEXT_EXTRACTION_FAILED") {
+    return "Text could not be extracted from this PDF.";
+  }
+  if (code === "CHUNKING_FAILED") {
+    return "The extracted text could not be prepared for study.";
+  }
+  return "Document processing failed. You can retry.";
 }

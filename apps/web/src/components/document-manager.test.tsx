@@ -155,9 +155,131 @@ describe("DocumentManager", () => {
       expect(screen.getByText("physics.pdf")).toBeInTheDocument();
     },
   );
+
+  it("shows lifecycle-specific Process, Processing, Ready, and Retry controls", async () => {
+    const uploaded = document("uploaded", "subject-1", "uploaded.pdf");
+    const processing = document("processing", "subject-1", "processing.pdf", "PROCESSING");
+    const ready = document("ready", "subject-1", "ready.pdf", "READY");
+    const failed = document(
+      "failed",
+      "subject-1",
+      "scanned.pdf",
+      "FAILED",
+      "TEXT_EXTRACTION_INSUFFICIENT",
+    );
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(
+      jsonResponse([uploaded, processing, ready, failed]),
+    ));
+    render(<DocumentManager selectedSubjectId="subject-1" />);
+
+    await screen.findByText("uploaded.pdf");
+    expect(screen.getByRole("button", { name: "Process" })).toBeInTheDocument();
+    expect(screen.getByText("Processing...")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
+    expect(screen.getByText(/OCR is not available yet/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /ready/i })).not.toBeInTheDocument();
+  });
+
+  it("updates the active Document after successful processing", async () => {
+    const ready = document("document-1", "subject-1", "notes.pdf", "READY");
+    const fetchMock = vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
+      if (init?.method === "POST") return jsonResponse(ready);
+      return jsonResponse([firstDocument]);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<DocumentManager selectedSubjectId="subject-1" />);
+    await screen.findByRole("button", { name: "Process" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Process" }));
+
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Process" }))
+      .not.toBeInTheDocument());
+    expect(screen.getByText(/READY/)).toBeInTheDocument();
+  });
+
+  it("publishes a safe FAILED state after processing fails", async () => {
+    const fetchMock = vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
+      if (init?.method === "POST") {
+        return jsonResponse({
+          error: {
+            code: "TEXT_EXTRACTION_INSUFFICIENT",
+            message: "PDF does not contain enough extractable text",
+          },
+        }, 422);
+      }
+      return jsonResponse([firstDocument]);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<DocumentManager selectedSubjectId="subject-1" />);
+    await screen.findByRole("button", { name: "Process" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Process" }));
+
+    expect(await screen.findByRole("button", { name: "Retry" })).toBeInTheDocument();
+    expect(screen.getAllByText(/OCR is not available yet/).length).toBeGreaterThan(0);
+    expect(screen.queryByText("TEXT_EXTRACTION_INSUFFICIENT")).not.toBeInTheDocument();
+  });
+
+  it.each(["success", "failure"] as const)(
+    "ignores a stale process %s after the Subject changes",
+    async (outcome) => {
+      let resolveProcess: ((value: object) => void) | undefined;
+      const pendingProcess = new Promise<object>((resolve) => { resolveProcess = resolve; });
+      const secondDocument = document("document-2", "subject-2", "physics.pdf");
+      const fetchMock = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        if (init?.method === "POST") return pendingProcess;
+        if (input.toString().includes("subject-2")) return jsonResponse([secondDocument]);
+        return jsonResponse([firstDocument]);
+      });
+      vi.stubGlobal("fetch", fetchMock);
+      const view = render(<DocumentManager selectedSubjectId="subject-1" />);
+      await screen.findByRole("button", { name: "Process" });
+      fireEvent.click(screen.getByRole("button", { name: "Process" }));
+      view.rerender(<DocumentManager selectedSubjectId="subject-2" />);
+      await screen.findByText("physics.pdf");
+
+      resolveProcess?.(outcome === "success"
+        ? jsonResponse(document("document-1", "subject-1", "notes.pdf", "READY"))
+        : jsonResponse({
+          error: { code: "PROCESSING_FAILED", message: "Stale process error" },
+        }, 500));
+
+      await waitFor(() => expect(screen.queryByText("notes.pdf")).not.toBeInTheDocument());
+      expect(screen.queryByText("Stale process error")).not.toBeInTheDocument();
+      expect(screen.getByText("physics.pdf")).toBeInTheDocument();
+    },
+  );
+
+  it("ignores a stale retry completion after the Subject changes", async () => {
+    let resolveRetry: ((value: object) => void) | undefined;
+    const pendingRetry = new Promise<object>((resolve) => { resolveRetry = resolve; });
+    const failed = document("document-1", "subject-1", "failed.pdf", "FAILED");
+    const secondDocument = document("document-2", "subject-2", "physics.pdf");
+    const fetchMock = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      if (init?.method === "POST") return pendingRetry;
+      if (input.toString().includes("subject-2")) return jsonResponse([secondDocument]);
+      return jsonResponse([failed]);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const view = render(<DocumentManager selectedSubjectId="subject-1" />);
+    await screen.findByRole("button", { name: "Retry" });
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    view.rerender(<DocumentManager selectedSubjectId="subject-2" />);
+    await screen.findByText("physics.pdf");
+
+    resolveRetry?.(jsonResponse(document("document-1", "subject-1", "failed.pdf", "READY")));
+    await waitFor(() => expect(screen.queryByText("failed.pdf")).not.toBeInTheDocument());
+    expect(screen.getByText("physics.pdf")).toBeInTheDocument();
+  });
 });
 
-function document(id: string, subjectId: string, filename: string) {
+function document(
+  id: string,
+  subjectId: string,
+  filename: string,
+  status: "UPLOADED" | "PROCESSING" | "READY" | "FAILED" = "UPLOADED",
+  errorCode: string | null = null,
+) {
   return {
     id,
     subject_id: subjectId,
@@ -165,8 +287,8 @@ function document(id: string, subjectId: string, filename: string) {
     mime_type: "application/pdf",
     size_bytes: 2048,
     checksum_sha256: "a".repeat(64),
-    status: "UPLOADED",
-    error_code: null,
+    status,
+    error_code: errorCode,
     processing_version: 1,
     embedding_provider: null,
     embedding_model: null,

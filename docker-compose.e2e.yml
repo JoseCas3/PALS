@@ -26,6 +26,8 @@ services:
       AI_TIMEOUT_SECONDS: 20
       DOCUMENT_STORAGE_ROOT: /var/lib/pals/documents
       DOCUMENT_MAX_SIZE_BYTES: 26214400
+      RAG_CHUNK_TARGET_TOKENS: 800
+      RAG_CHUNK_OVERLAP_TOKENS: 120
     depends_on:
       postgres-e2e:
         condition: service_healthy

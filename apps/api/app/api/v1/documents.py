@@ -4,14 +4,40 @@ from typing import Annotated
 from fastapi import APIRouter, File, Response, UploadFile, status
 
 from app.api.dependencies import (
+    DocumentExtractorDependency,
     DocumentMaxSizeDependency,
     DocumentStorageDependency,
     Session,
 )
+from app.core.config import get_settings
+from app.ingestion.chunking import DocumentChunker
+from app.ingestion.normalization import TextNormalizer
+from app.ingestion.service import IngestionService
 from app.schemas.document import DocumentResponse
 from app.services.documents import DocumentService
 
 router = APIRouter(tags=["documents"])
+
+
+@router.post("/documents/{document_id}/process", response_model=DocumentResponse)
+async def process_document(
+    document_id: uuid.UUID,
+    session: Session,
+    storage: DocumentStorageDependency,
+    extractor: DocumentExtractorDependency,
+) -> DocumentResponse:
+    settings = get_settings()
+    document = await IngestionService(
+        session,
+        storage,
+        extractor,
+        TextNormalizer(),
+        DocumentChunker(
+            settings.rag_chunk_target_tokens,
+            settings.rag_chunk_overlap_tokens,
+        ),
+    ).process(document_id)
+    return DocumentResponse.model_validate(document)
 
 
 @router.post(

@@ -58,20 +58,26 @@ by existing Topic or Exam rules; when otherwise valid, it removes Subject Docume
 the database cascade their rows. No Document operation touches Questions, Attempts, Mastery,
 AIInteraction, or planner inputs.
 
-## R1 status semantics
+R2 processing reads through `DocumentStorage`, extracts immutable one-based page values through a
+library-neutral `DocumentExtractor`, normalizes each page with deterministic NFC-based rules, and
+produces transient page-aware lexical-token chunks. Blocking parsing runs outside the event loop
+and outside a database transaction. R2 persists only lifecycle status and safe error codes.
+
+## R1-R2 status semantics
 
 The controlled statuses are `UPLOADED`, `PROCESSING`, `READY`, and `FAILED`. R1 creates only
-`UPLOADED`. `processing_version` starts at 1. `error_code`, `embedding_provider`, `embedding_model`,
-and `embedding_dimensions` remain null in R1. The additional states and fields reserve the frozen
-lifecycle contract; they do not imply that processing exists.
+`UPLOADED`; R2 atomically claims processing and records READY or FAILED. R2 READY is an intermediate
+milestone meaning deterministic extraction, normalization, and transient chunking succeeded. It
+does not mean retrieval-ready. R3 will extend READY publication to require persisted chunks and
+embeddings. `processing_version` starts at 1; embedding metadata remains null in R2.
 
 ## Future extraction, chunks, embeddings, and retrieval
 
-R2 may add synchronous PDF text extraction and deterministic normalization, without OCR. R3 may
-add DocumentChunk records with stable ordering and provenance. A later embedding sprint may add a
-provider-neutral embedding service and PostgreSQL pgvector storage; PALS will not use an external
-vector database. Retrieval may then combine Subject scope, similarity, thresholds, and stable
-ordering before Tutor or Question Generation consume grounded context and return citations.
+R2 adds synchronous PDF text extraction, deterministic normalization, and transient chunks without
+OCR. R3 may add DocumentChunk records with stable ordering and provenance plus a provider-neutral
+embedding service and PostgreSQL pgvector storage; PALS will not use an external vector database.
+Retrieval may then combine Subject scope, similarity, thresholds, and stable ordering before Tutor
+or Question Generation consume grounded context and return citations.
 
 Processing remains synchronous initially. Workers are deferred until measured workload requires
 them. OCR, semantic chunking, external vector stores, S3/MinIO, LangChain, LlamaIndex, and
@@ -79,12 +85,12 @@ Unstructured are outside the frozen architecture.
 
 ## R2-R7 roadmap
 
-1. R2: deterministic PDF text extraction and normalization, no OCR.
-2. R3: persisted chunks and processing lifecycle transitions.
-3. R4: provider-neutral embeddings stored in PostgreSQL with pgvector.
-4. R5: Subject-scoped retrieval with deterministic filtering and thresholds.
-5. R6: grounded Tutor context and source citations without changing evidence authority.
-6. R7: grounded Question Generation and end-to-end RAG hardening.
+1. R2: deterministic PDF extraction, normalization, transient chunking, and lifecycle transitions.
+2. R3: persisted chunks, embeddings, pgvector, and atomic retrieval-ready publication.
+3. R4: Subject-scoped retrieval with deterministic filtering and thresholds.
+4. R5: grounded Tutor context and source citations without changing evidence authority.
+5. R6: grounded Question Generation without changing evidence authority.
+6. R7: end-to-end RAG hardening.
 
 Each sprint must preserve local-first operation, provider isolation, metadata-only AIInteraction,
 and the rule that only successful Attempt creation changes Mastery.

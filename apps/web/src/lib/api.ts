@@ -19,8 +19,15 @@ import type {
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 type ErrorEnvelope = {
-  error?: { message?: string };
+  error?: { code?: string; message?: string };
 };
+
+export class ApiError extends Error {
+  constructor(message: string, public readonly code?: string) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const isFormData = typeof FormData !== "undefined" && init?.body instanceof FormData;
@@ -35,13 +42,15 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
   if (!response.ok) {
     let message = `Request failed (${response.status})`;
+    let code: string | undefined;
     try {
       const payload = (await response.json()) as ErrorEnvelope;
       message = payload.error?.message ?? message;
+      code = payload.error?.code;
     } catch {
       // Preserve the status-based fallback when the server does not return JSON.
     }
-    throw new Error(message);
+    throw new ApiError(message, code);
   }
 
   if (response.status === 204) {
@@ -72,6 +81,8 @@ export const api = {
   },
   deleteDocument: (id: string) =>
     request<void>(`/documents/${id}`, { method: "DELETE" }),
+  processDocument: (id: string) =>
+    request<Document>(`/documents/${id}/process`, { method: "POST" }),
 
   listTopics: (subjectId: string) => request<Topic[]>(`/subjects/${subjectId}/topics`),
   createTopic: (subjectId: string, value: { name: string; description?: string }) =>
