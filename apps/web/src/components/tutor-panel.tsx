@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { api } from "../lib/api";
+import type { GroundedCitation } from "../lib/types";
 
 const levels = [
   { value: 1, name: "Concept", description: "One conceptual hint" },
@@ -20,6 +21,9 @@ export function TutorPanel({ questionId }: { questionId: string }) {
 function TutorPanelState({ questionId }: { questionId: string }) {
   const [helpLevel, setHelpLevel] = useState(1);
   const [content, setContent] = useState("");
+  const [citations, setCitations] = useState<GroundedCitation[]>([]);
+  const [groundingRequired, setGroundingRequired] = useState(false);
+  const [insufficient, setInsufficient] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -27,10 +31,17 @@ function TutorPanelState({ questionId }: { questionId: string }) {
     if (loading) return;
     setLoading(true);
     setContent("");
+    setCitations([]);
+    setInsufficient(false);
     setError("");
     try {
-      const result = await api.getTutorHelp(questionId, helpLevel);
-      setContent(result.content);
+      const result = await api.getTutorHelp(questionId, helpLevel, groundingRequired);
+      if (result.outcome === "INSUFFICIENT_EVIDENCE") {
+        setInsufficient(true);
+      } else {
+        setContent(result.answer ?? result.content ?? "");
+        setCitations(result.citations ?? []);
+      }
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Tutor is unavailable");
     } finally {
@@ -65,8 +76,40 @@ function TutorPanelState({ questionId }: { questionId: string }) {
           </button>
         ))}
       </div>
+      <label className="tutor-grounding-option">
+        <input
+          type="checkbox"
+          checked={groundingRequired}
+          disabled={loading}
+          onChange={(event) => setGroundingRequired(event.target.checked)}
+        />
+        Ground this answer in my Subject documents
+      </label>
       {error && <p role="alert" className="error-banner">{error}</p>}
+      {insufficient && (
+        <p role="status" className="empty-state">
+          The available Subject documents do not contain sufficient evidence for this request.
+        </p>
+      )}
       {content && <div className="tutor-response" aria-label="Tutor response">{content}</div>}
+      {citations.length > 0 && (
+        <div className="tutor-sources" aria-label="Tutor sources">
+          <strong>Sources</strong>
+          <ul>
+            {citations.map((citation) => (
+              <li key={citation.alias}>
+                {citation.alias} — {citation.document_filename}, {formatPages(citation)}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
+}
+
+function formatPages(citation: GroundedCitation) {
+  return citation.page_start === citation.page_end
+    ? `p. ${citation.page_start}`
+    : `pp. ${citation.page_start}–${citation.page_end}`;
 }

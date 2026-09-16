@@ -81,8 +81,9 @@ OCR. R3 adds DocumentChunk records with stable ordering and provenance plus a pr
 embedding service and PostgreSQL pgvector storage; PALS does not use an external vector database.
 R4 implements internal Subject-scoped exact cosine retrieval, exact embedding-profile eligibility,
 centralized thresholds and limits, deterministic deduplication, stable ordering, explicit
-sufficiency, and provenance-preserving result values. Tutor and Question Generation do not consume
-retrieval until their later sprints. See `RAG_R4.md`.
+sufficiency, and provenance-preserving result values. R5 lets explicit REQUIRED Question Tutor
+requests consume retrieval through server-issued aliases and validated response-level citations;
+Question Generation remains ungrounded. See `RAG_R4.md` and `RAG_R5.md`.
 
 Processing remains synchronous initially. Workers are deferred until measured workload requires
 them. OCR, semantic chunking, external vector stores, S3/MinIO, LangChain, LlamaIndex, and
@@ -92,9 +93,9 @@ Unstructured are outside the frozen architecture.
 
 1. R2: deterministic PDF extraction, normalization, transient chunking, and lifecycle transitions.
 2. R3: persisted chunks, embeddings, pgvector, and atomic retrieval-ready publication.
-3. R4: Subject-scoped retrieval with deterministic filtering and thresholds (implemented; awaiting
-   independent review and manual validation).
-4. R5: grounded Tutor context and source citations without changing evidence authority.
+3. R4: Subject-scoped retrieval with deterministic filtering and thresholds (closed).
+4. R5: grounded Tutor context and source citations without changing evidence authority
+   (implemented; pending independent review).
 5. R6: grounded Question Generation without changing evidence authority.
 6. R7: end-to-end RAG hardening.
 

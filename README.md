@@ -114,6 +114,9 @@ with embeddings to PostgreSQL pgvector. The active profile defaults to OpenAI
 fake provider. R4 adds internal Subject-scoped exact-cosine retrieval configured by
 `RETRIEVAL_TOP_K` (8), `RETRIEVAL_MAX_LIMIT` (50), and `RETRIEVAL_MIN_RELEVANCE` (0.0). The initial
 threshold is engineering plumbing, not production semantic calibration.
+R5 adds explicit REQUIRED grounding to the existing Question Tutor, with structured insufficiency,
+transient server-issued source aliases, validated response-level provenance, and no Mastery effect.
+See `docs/RAG_R5.md`.
 
 ## Sprint 1 domain core
 
@@ -224,6 +227,6 @@ npm run test:e2e
 R1 adds Subject-owned PDF Documents with PostgreSQL metadata and opaque-key local filesystem
 storage. R2 adds explicit deterministic PDF extraction and page-aware chunking. R3 adds a separate
 embedding boundary, pgvector 0.8.6, persistent `DocumentChunk` rows, atomic retrieval-ready
-publication, and an internal R4 Retrieval Service awaiting independent review. Grounding and
-citations remain deferred. See `docs/RAG_R1.md`, `docs/RAG_R2.md`, `docs/RAG_R3.md`,
-`docs/RAG_R4.md`, and `docs/RAG_ARCHITECTURE.md`.
+publication, the closed R4 Retrieval Service, and an R5 Grounded Tutor implementation pending
+independent review. Rich R6 citation UX remains deferred. See `docs/RAG_R1.md`, `docs/RAG_R2.md`,
+`docs/RAG_R3.md`, `docs/RAG_R4.md`, `docs/RAG_R5.md`, and `docs/RAG_ARCHITECTURE.md`.

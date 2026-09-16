@@ -5,7 +5,11 @@ from fastapi import APIRouter, Depends, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.gateway import AIGateway
-from app.api.dependencies import get_ai_gateway, get_session
+from app.api.dependencies import (
+    RetrievalServiceDependency,
+    get_ai_gateway,
+    get_session,
+)
 from app.schemas.tutor import TutorRequest, TutorResponse
 from app.services.tutor import TutorService
 
@@ -20,10 +24,11 @@ async def tutor_question(
     data: TutorRequest,
     session: Session,
     gateway: Gateway,
+    retrieval: RetrievalServiceDependency,
     response: Response,
 ) -> TutorResponse:
     response.headers["Cache-Control"] = "no-store"
-    result = await TutorService(session, gateway).help_question(
-        question_id, data.help_level
+    result = await TutorService(session, gateway, retrieval).help_question(
+        question_id, data.help_level, data.grounding_mode
     )
     return TutorResponse.model_validate(result, from_attributes=True)

@@ -61,6 +61,20 @@ Provider output is untrusted. Empty, whitespace-only, or greater-than-12,000-cha
 are rejected. The frontend renders text without HTML or a Markdown renderer. One request makes
 one provider attempt; there are no retries or conversations.
 
+## RAG R5 Grounded Question Tutor
+
+Question Tutor requests may explicitly select `grounding_mode=REQUIRED`. Subject ownership is
+derived from the Question. Retrieval occurs before generation, and insufficient evidence returns a
+typed response without an AI call or `AIInteraction`. Sufficient evidence receives deterministic
+S1/S2 aliases and is placed in an explicitly untrusted source block. Existing level 1–6 ceilings
+remain authoritative.
+
+Grounded generation uses the existing provider-neutral strict JSON Schema mechanism for `answer`
+and alias-only `citations`. The server rejects malformed output, missing citations, and any unknown
+alias as `GROUNDING_INVALID_RESPONSE`; it derives all citation UUID, filename, and page provenance
+from the retrieval mapping. Grounded calls retain metadata-only `AIInteraction` behavior and never
+store prompts, source text, generated answers, or citations.
+
 ## Sprint 5 structured Question generation
 
 Question generation uses neutral prompt version `question_generation.v1`, a fixed 4,000 output-token

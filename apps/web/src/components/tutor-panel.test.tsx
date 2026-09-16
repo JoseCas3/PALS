@@ -57,6 +57,76 @@ describe("TutorPanel", () => {
       "true",
     );
   });
+
+  it("requests grounded help and renders single and multi-page sources", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse({
+        outcome: "ANSWER",
+        answer: "A grounded hint.",
+        content: "A grounded hint.",
+        citations: [
+          {
+            alias: "S1",
+            document_filename: "notes.pdf",
+            page_start: 3,
+            page_end: 3,
+          },
+          {
+            alias: "S2",
+            document_filename: "chapter.pdf",
+            page_start: 4,
+            page_end: 6,
+          },
+        ],
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    render(<TutorPanel questionId="question-1" />);
+
+    fireEvent.click(screen.getByLabelText("Ground this answer in my Subject documents"));
+    fireEvent.click(screen.getByRole("button", { name: "Get help" }));
+
+    expect(await screen.findByLabelText("Tutor response")).toHaveTextContent(
+      "A grounded hint.",
+    );
+    expect(screen.getByLabelText("Tutor sources")).toHaveTextContent(
+      "S1 — notes.pdf, p. 3",
+    );
+    expect(screen.getByLabelText("Tutor sources")).toHaveTextContent(
+      "S2 — chapter.pdf, pp. 4–6",
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:8000/api/v1/questions/question-1/tutor",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ help_level: 1, grounding_mode: "REQUIRED" }),
+      }),
+    );
+  });
+
+  it("renders explicit insufficient evidence without a fake empty answer", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        jsonResponse({
+          outcome: "INSUFFICIENT_EVIDENCE",
+          answer: null,
+          content: null,
+          citations: [],
+        }),
+      ),
+    );
+    render(<TutorPanel questionId="question-1" />);
+
+    fireEvent.click(screen.getByLabelText("Ground this answer in my Subject documents"));
+    fireEvent.click(screen.getByRole("button", { name: "Get help" }));
+
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "do not contain sufficient evidence",
+    );
+    expect(screen.queryByLabelText("Tutor response")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Tutor sources")).not.toBeInTheDocument();
+  });
 });
 
 function jsonResponse(payload: object, status = 200) {

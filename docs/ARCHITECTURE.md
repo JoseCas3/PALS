@@ -34,6 +34,12 @@ repository owns filtering and exact cosine ordering; the service owns query prep
 thresholding, deterministic text-identity deduplication, final limits, and sufficiency. No public
 retrieval route or evidence mutation path exists.
 
+R5 extends the existing Question Tutor additively. In REQUIRED mode, `TutorService` calls
+`RetrievalService`, builds transient S1/S2 source aliases, sends a delimited untrusted-evidence block
+through `AIGateway` with a strict structured-output contract, and resolves validated aliases back to
+server-owned provenance. Insufficiency returns before AI generation. Citations are response-only;
+Question Generation, Attempts, Mastery, and planner evidence remain outside the flow.
+
 ## Backend layers
 API routes → services → repositories → database
 

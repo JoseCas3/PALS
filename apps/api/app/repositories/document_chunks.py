@@ -3,14 +3,17 @@ from __future__ import annotations
 import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.embeddings.contracts import EmbeddingVector
-from app.ingestion.chunking import ProcessedChunk
 from app.models.document import Document
 from app.models.document_chunk import DocumentChunk
+
+if TYPE_CHECKING:
+    from app.ingestion.chunking import ProcessedChunk
 
 
 @dataclass(frozen=True)

@@ -102,14 +102,27 @@ export type AttemptResult = {
 };
 
 export type TutorResponse = {
-  interaction_id: string;
+  interaction_id: string | null;
   question_id: string;
   help_level: number;
-  content: string;
-  provider: string;
-  model: string;
+  grounding_mode: "NONE" | "REQUIRED";
+  outcome: "ANSWER" | "INSUFFICIENT_EVIDENCE";
+  content: string | null;
+  answer: string | null;
+  citations: GroundedCitation[];
+  provider: string | null;
+  model: string | null;
   prompt_version: string;
-  created_at: string;
+  created_at: string | null;
+};
+
+export type GroundedCitation = {
+  alias: string;
+  chunk_id: string;
+  document_id: string;
+  document_filename: string;
+  page_start: number;
+  page_end: number;
 };
 
 export type PlannerFactorCode = "mastery_need" | "urgency" | "exam_weight";

@@ -2,7 +2,7 @@
 
 ## Status and scope
 
-R4 is implemented and awaiting independent review and manual validation. It adds an internal-only
+R4 is closed after implementation, independent review, and manual validation. It adds an internal-only
 `RetrievalService`; it does not add an HTTP search endpoint, Tutor or Question Generation
 integration, citation aliases, reranking, or an ANN index. Retrieval is evidence-neutral and has no
 Attempt, Mastery, planner-evidence, or `AIInteraction` write path.

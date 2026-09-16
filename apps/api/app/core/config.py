@@ -34,6 +34,9 @@ class Settings(BaseSettings):
     def validate_chunk_configuration(self) -> Settings:
         if self.rag_chunk_overlap_tokens >= self.rag_chunk_target_tokens:
             raise ValueError("RAG chunk overlap must be smaller than the target")
+        self.ai_provider = self.ai_provider.strip().lower()
+        if self.ai_provider not in {"openai", "fake"}:
+            raise ValueError("AI provider must be 'openai' or 'fake'")
         self.embedding_provider = self.embedding_provider.strip().lower()
         if self.embedding_provider not in {"openai", "fake"}:
             raise ValueError("Embedding provider must be 'openai' or 'fake'")

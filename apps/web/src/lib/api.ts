@@ -149,10 +149,13 @@ export const api = {
       ...body(value),
     }),
   getMastery: (topicId: string) => request<Mastery>(`/topics/${topicId}/mastery`),
-  getTutorHelp: (questionId: string, helpLevel: number) =>
+  getTutorHelp: (questionId: string, helpLevel: number, groundingRequired = false) =>
     request<TutorResponse>(`/questions/${questionId}/tutor`, {
       method: "POST",
-      ...body({ help_level: helpLevel }),
+      ...body({
+        help_level: helpLevel,
+        ...(groundingRequired ? { grounding_mode: "REQUIRED" } : {}),
+      }),
     }),
   getStudyPlan: (examId: string) => request<StudyPlan>(`/exams/${examId}/study-plan`),
   getGlobalStudyPlan: () => request<GlobalStudyPlan>("/study-plan"),

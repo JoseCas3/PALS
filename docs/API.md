@@ -176,9 +176,10 @@ deferred.
 
 - `POST /questions/{question_id}/tutor` -> 200
 
-The request is `{"help_level": 1}` with a strict integer from 1 through 6. The response contains
-interaction and Question IDs, level, plain-text content, provider, configured/returned model,
-prompt version `question_tutor.v1`, and creation time. Responses use `Cache-Control: no-store`.
+The request requires a strict integer `help_level` from 1 through 6 and accepts optional
+`grounding_mode` (`NONE`, the default, or `REQUIRED`). Subject context is derived from the Question;
+clients do not supply a Subject ID. Responses use `Cache-Control: no-store` and include typed
+`grounding_mode`, `outcome`, `answer`, and `citations` alongside compatible `content`.
 
 Levels provide, in order: conceptual hint, principle/formula, strategy, first concrete step,
 guided solution without the final answer, and full solution. Levels 1 through 4 never send the
@@ -188,6 +189,13 @@ block; level 5 still withholds the final answer.
 Oversized Tutor context returns 422 `TUTOR_CONTEXT_TOO_LARGE`. Provider errors map to 502 or 503;
 timeouts return 504. Safe provider errors may include the interaction ID in `details`. Missing AI
 configuration returns 503 `AI_PROVIDER_UNAVAILABLE` without affecting other endpoints.
+
+REQUIRED mode calls internal Subject-scoped retrieval before generation. Insufficient evidence
+returns 200 with `outcome=INSUFFICIENT_EVIDENCE`, null answer/content and interaction/provider
+metadata, and empty citations; there is no generative call. A grounded `ANSWER` contains at least
+one server-validated citation with alias, chunk ID, Document ID, original filename, and integer page
+range. Malformed structured output, no citations, or any fabricated alias returns sanitized 502
+`GROUNDING_INVALID_RESPONSE`. Provider failures retain their existing codes.
 
 ## Health
 
