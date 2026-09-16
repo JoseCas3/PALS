@@ -23,3 +23,14 @@ class DocumentResponse(BaseModel):
     embedding_dimensions: int | None
     created_at: datetime
     updated_at: datetime
+
+
+class DocumentEvidenceResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    chunk_id: uuid.UUID
+    document_id: uuid.UUID
+    document_filename: str
+    page_start: int
+    page_end: int
+    text: str

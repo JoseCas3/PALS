@@ -76,6 +76,27 @@ form button { border: 0; border-radius: .8rem; background: var(--accent); paddin
 .help-levels strong, .help-levels span { display: block; }
 .help-levels span { margin-top: .2rem; color: var(--muted); font-size: .75rem; }
 .tutor-response { max-height: 24rem; overflow: auto; border-left: 3px solid var(--accent); background: rgba(38,115,77,.07); padding: .85rem 1rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+.tutor-sources ul { display: grid; gap: .65rem; margin: .65rem 0 0; padding: 0; list-style: none; }
+.citation-card { display: flex; align-items: center; justify-content: space-between; gap: 1rem; border: 1px solid var(--border); border-radius: .8rem; background: white; padding: .8rem; }
+.citation-card > div { display: grid; gap: .12rem; min-width: 0; }
+.citation-alias { color: var(--accent); font-size: .8rem; }
+.citation-filename { overflow-wrap: anywhere; font-weight: 700; }
+.citation-pages, .evidence-note { color: var(--muted); font-size: .875rem; }
+.citation-link, .back-link, .unavailable-source > a { color: var(--accent); font-weight: 700; text-decoration-thickness: .1em; text-underline-offset: .18em; }
+.citation-link:focus-visible, .back-link:focus-visible, .item-main a:focus-visible, .quiet:focus-visible { border-radius: .3rem; outline: 3px solid rgba(38,115,77,.35); outline-offset: 3px; }
+.back-link { display: inline-block; margin-bottom: 1rem; }
+.document-detail { display: grid; gap: 1.25rem; }
+.document-detail h1 { margin: 0; overflow-wrap: anywhere; font-size: clamp(1.8rem, 5vw, 2.8rem); }
+.document-metadata { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .75rem; margin: 1.25rem 0 0; }
+.document-metadata div { border-radius: .75rem; background: rgba(38,115,77,.07); padding: .75rem; }
+.document-metadata dt { color: var(--muted); font-size: .75rem; font-weight: 700; text-transform: uppercase; }
+.document-metadata dd { margin: .25rem 0 0; overflow-wrap: anywhere; }
+.source-evidence h2 { margin-bottom: .5rem; }
+.evidence-location { margin: .7rem 0 .2rem; color: var(--accent); font-weight: 700; }
+.evidence-note { margin: 0 0 1rem; }
+.evidence-text { max-height: 32rem; overflow: auto; border: 1px solid var(--border); border-radius: .8rem; background: #fff; padding: 1rem; color: var(--foreground); font: inherit; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+.unavailable-source { display: grid; gap: 1rem; }
+.unavailable-source .error-banner { margin: 0; }
 .attempt-form { display: grid; gap: .75rem; }
 .checkbox { display: flex; align-items: center; gap: .5rem; color: var(--muted); }
 .checkbox input { min-width: auto; }
@@ -115,6 +136,8 @@ button:disabled { cursor: not-allowed; opacity: .6; }
   .plan-metrics, .factor-list, .help-levels { grid-template-columns: 1fr; }
   .tutor-heading { align-items: flex-start; flex-direction: column; }
   .global-plan-heading { flex-direction: column; }
+  .citation-card { align-items: flex-start; flex-direction: column; }
+  .document-metadata { grid-template-columns: 1fr; }
   .item-list li { align-items: stretch; flex-wrap: wrap; }
   .item-list li .item-main { min-width: 100%; }
   .practice-topic-action, .generation-controls > button { width: 100%; }

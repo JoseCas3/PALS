@@ -3,9 +3,9 @@
 ## Purpose and non-goals
 
 The Post-Alpha RAG track will let PALS use a learner's Subject-owned course documents as grounded
-study context. R1 establishes only durable Document identity, metadata, validation, local storage,
-and lifecycle states. R1 does not extract text, create chunks or embeddings, retrieve passages,
-ground Tutor or Question Generation, or add citations.
+study context. R1 establishes durable Document identity, metadata, validation, local storage, and
+lifecycle states; R2–R6 incrementally add processing, embeddings, retrieval, grounded Tutor, and
+usable citation navigation while preserving the frozen boundaries below.
 
 PALS remains a single-user, local-first modular monolith with Next.js, FastAPI, PostgreSQL, and a
 local filesystem. It does not add authentication, network object storage, a vector database,
@@ -83,7 +83,10 @@ R4 implements internal Subject-scoped exact cosine retrieval, exact embedding-pr
 centralized thresholds and limits, deterministic deduplication, stable ordering, explicit
 sufficiency, and provenance-preserving result values. R5 lets explicit REQUIRED Question Tutor
 requests consume retrieval through server-issued aliases and validated response-level citations;
-Question Generation remains ungrounded. See `RAG_R4.md` and `RAG_R5.md`.
+Question Generation remains ungrounded. R6 consumes those provenance IDs through an exact
+READY-Document evidence lookup and `/documents/{document_id}?chunk={chunk_id}` UI route. Aliases
+remain transient, source text is rendered as untrusted plain text, and neither the endpoint nor UI
+invokes retrieval or AI. See `RAG_R4.md`, `RAG_R5.md`, and `RAG_R6.md`.
 
 Processing remains synchronous initially. Workers are deferred until measured workload requires
 them. OCR, semantic chunking, external vector stores, S3/MinIO, LangChain, LlamaIndex, and
@@ -94,9 +97,8 @@ Unstructured are outside the frozen architecture.
 1. R2: deterministic PDF extraction, normalization, transient chunking, and lifecycle transitions.
 2. R3: persisted chunks, embeddings, pgvector, and atomic retrieval-ready publication.
 3. R4: Subject-scoped retrieval with deterministic filtering and thresholds (closed).
-4. R5: grounded Tutor context and source citations without changing evidence authority
-   (implemented; pending independent review).
-5. R6: grounded Question Generation without changing evidence authority.
+4. R5: grounded Tutor context and source citations without changing evidence authority (closed).
+5. R6: citation navigation and Document evidence UX (implemented; pending independent review).
 6. R7: end-to-end RAG hardening.
 
 Each sprint must preserve local-first operation, provider isolation, metadata-only AIInteraction,

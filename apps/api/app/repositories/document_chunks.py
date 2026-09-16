@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.embeddings.contracts import EmbeddingVector
 from app.models.document import Document
 from app.models.document_chunk import DocumentChunk
+from app.models.subject import Subject
 
 if TYPE_CHECKING:
     from app.ingestion.chunking import ProcessedChunk
@@ -25,6 +26,16 @@ class RetrievalCandidate:
     page_end: int
     text: str
     cosine_distance: float
+
+
+@dataclass(frozen=True)
+class DocumentEvidence:
+    chunk_id: uuid.UUID
+    document_id: uuid.UUID
+    document_filename: str
+    page_start: int
+    page_end: int
+    text: str
 
 
 class DocumentChunkRepository:
@@ -75,6 +86,40 @@ class DocumentChunkRepository:
                 )
             )
             or 0
+        )
+
+    async def get_ready_evidence(
+        self, document_id: uuid.UUID, chunk_id: uuid.UUID
+    ) -> DocumentEvidence | None:
+        row = (
+            await self.session.execute(
+                select(
+                    DocumentChunk.id,
+                    DocumentChunk.document_id,
+                    Document.original_filename,
+                    DocumentChunk.page_start,
+                    DocumentChunk.page_end,
+                    DocumentChunk.text,
+                )
+                .join(Document, Document.id == DocumentChunk.document_id)
+                .join(Subject, Subject.id == Document.subject_id)
+                .where(
+                    Document.id == document_id,
+                    Document.status == "READY",
+                    DocumentChunk.id == chunk_id,
+                    DocumentChunk.document_id == document_id,
+                )
+            )
+        ).one_or_none()
+        if row is None:
+            return None
+        return DocumentEvidence(
+            chunk_id=row.id,
+            document_id=row.document_id,
+            document_filename=row.original_filename,
+            page_start=row.page_start,
+            page_end=row.page_end,
+            text=row.text,
         )
 
     async def retrieve_candidates(

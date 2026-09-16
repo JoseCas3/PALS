@@ -18,6 +18,8 @@ frontend; Practice selection and refresh revisions are in-memory UI concerns and
 - `POST /subjects/{subject_id}/documents` returns 201 and accepts multipart field `file`.
 - `GET /subjects/{subject_id}/documents` returns 200 with an oldest-first Subject-scoped list.
 - `GET /documents/{document_id}` returns 200 with public metadata.
+- `GET /documents/{document_id}/chunks/{chunk_id}` returns one exact citation evidence excerpt
+  only when the chunk belongs to that Document and the Document is `READY`.
 - `DELETE /documents/{document_id}` returns 204 after deleting the file and row.
 - `POST /documents/{document_id}/process` processes an `UPLOADED`, `FAILED`, or legacy R2 READY
   PDF and returns 200 only after atomically publishing all persistent chunks and embeddings.
@@ -30,13 +32,18 @@ deletion also cleans associated Document files and cascades their metadata rows.
 
 Document errors use `UNSUPPORTED_FILE_TYPE`, `FILE_TOO_LARGE`, `INVALID_PDF`,
 `DOCUMENT_ALREADY_EXISTS`, `DOCUMENT_NOT_FOUND`, and `DOCUMENT_STORAGE_ERROR` as applicable.
+Exact evidence lookup additionally uses safe 404 `DOCUMENT_EVIDENCE_NOT_FOUND` for missing,
+cross-Document, or non-READY chunk targets. Its response contains only chunk ID, Document ID,
+server-derived filename, page range, and exact chunk text. It never returns embeddings, storage
+keys, filesystem paths, adjacent chunks, or full Document text, and it calls no retrieval or AI.
 
 Processing may return `TEXT_EXTRACTION_FAILED`, `TEXT_EXTRACTION_INSUFFICIENT`, `CHUNKING_FAILED`,
 `EMBEDDING_UNAVAILABLE`, `EMBEDDING_FAILED`, `EMBEDDING_DIMENSION_MISMATCH`, or
 `PROCESSING_FAILED`. PROCESSING and fully R3 READY documents reject processing with
 `DOCUMENT_ALREADY_PROCESSING` and `DOCUMENT_ALREADY_PROCESSED`. A legacy R2 READY document is
 eligible only when all embedding metadata is null and no chunks exist. Chunk text, IDs, and vectors
-are never exposed by the public API.
+are not exposed by processing or metadata APIs. R6's exact citation-evidence endpoint is the sole
+narrow exception for one identified chunk's ID and text; vectors remain private.
 
 ## Topics
 
@@ -196,6 +203,10 @@ metadata, and empty citations; there is no generative call. A grounded `ANSWER` 
 one server-validated citation with alias, chunk ID, Document ID, original filename, and integer page
 range. Malformed structured output, no citations, or any fabricated alias returns sanitized 502
 `GROUNDING_INVALID_RESPONSE`. Provider failures retain their existing codes.
+
+R6 uses each citation's authoritative Document and chunk IDs to navigate to
+`/documents/{document_id}?chunk={chunk_id}`. Alias, filename, pages, and text are not accepted as URL
+provenance. R5 response fields remain unchanged.
 
 ## Health
 

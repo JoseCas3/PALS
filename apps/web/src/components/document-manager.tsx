@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
+import Link from "next/link";
 
 import { ApiError, api } from "../lib/api";
 import type { Document } from "../lib/types";
@@ -142,7 +143,7 @@ export function DocumentManager({ selectedSubjectId }: { selectedSubjectId: stri
       <div>
         <p className="eyebrow">Subject resources</p>
         <h2 id="documents-heading">Documents</h2>
-        <p className="empty">PDF extraction is local. Retrieval is not available yet.</p>
+        <p className="empty">Process PDFs for grounded Tutor answers and source evidence.</p>
       </div>
 
       {error && <p role="alert" className="error-banner">{error}</p>}
@@ -175,7 +176,9 @@ export function DocumentManager({ selectedSubjectId }: { selectedSubjectId: stri
               {documents.map((document) => (
                 <li key={document.id}>
                   <div className="item-main">
-                    <strong>{document.original_filename}</strong>
+                    <Link href={`/documents/${encodeURIComponent(document.id)}`}>
+                      <strong>{document.original_filename}</strong>
+                    </Link>
                     <span>{document.status} · {formatBytes(document.size_bytes)}</span>
                     {document.status === "FAILED" && (
                       <span>{processFailureMessage(document.error_code)}</span>
@@ -193,6 +196,13 @@ export function DocumentManager({ selectedSubjectId }: { selectedSubjectId: stri
                     </button>
                   )}
                   {document.status === "PROCESSING" && <span>Processing...</span>}
+                  <Link
+                    className="quiet"
+                    href={`/documents/${encodeURIComponent(document.id)}`}
+                    aria-label={`View Document ${document.original_filename}`}
+                  >
+                    View
+                  </Link>
                   <button
                     type="button"
                     className="danger"

@@ -50,6 +50,15 @@ export type Document = {
   updated_at: string;
 };
 
+export type DocumentEvidence = {
+  chunk_id: string;
+  document_id: string;
+  document_filename: string;
+  page_start: number;
+  page_end: number;
+  text: string;
+};
+
 export type QuestionDifficulty = "easy" | "medium" | "hard";
 export type GenerationDifficulty = QuestionDifficulty | "mixed";
 

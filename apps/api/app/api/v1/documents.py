@@ -15,7 +15,7 @@ from app.embeddings.service import EmbeddingService
 from app.ingestion.chunking import DocumentChunker
 from app.ingestion.normalization import TextNormalizer
 from app.ingestion.service import IngestionService
-from app.schemas.document import DocumentResponse
+from app.schemas.document import DocumentEvidenceResponse, DocumentResponse
 from app.services.documents import DocumentService
 
 router = APIRouter(tags=["documents"])
@@ -89,6 +89,20 @@ async def get_document(
 ) -> DocumentResponse:
     document = await DocumentService(session, storage).get(document_id)
     return DocumentResponse.model_validate(document)
+
+
+@router.get(
+    "/documents/{document_id}/chunks/{chunk_id}",
+    response_model=DocumentEvidenceResponse,
+)
+async def get_document_evidence(
+    document_id: uuid.UUID,
+    chunk_id: uuid.UUID,
+    session: Session,
+    storage: DocumentStorageDependency,
+) -> DocumentEvidenceResponse:
+    evidence = await DocumentService(session, storage).get_evidence(document_id, chunk_id)
+    return DocumentEvidenceResponse.model_validate(evidence)
 
 
 @router.delete("/documents/{document_id}", status_code=status.HTTP_204_NO_CONTENT)

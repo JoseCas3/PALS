@@ -67,12 +67,16 @@ describe("TutorPanel", () => {
         citations: [
           {
             alias: "S1",
+            chunk_id: "11111111-1111-4111-8111-111111111111",
+            document_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
             document_filename: "notes.pdf",
             page_start: 3,
             page_end: 3,
           },
           {
             alias: "S2",
+            chunk_id: "22222222-2222-4222-8222-222222222222",
+            document_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
             document_filename: "chapter.pdf",
             page_start: 4,
             page_end: 6,
@@ -89,12 +93,13 @@ describe("TutorPanel", () => {
     expect(await screen.findByLabelText("Tutor response")).toHaveTextContent(
       "A grounded hint.",
     );
-    expect(screen.getByLabelText("Tutor sources")).toHaveTextContent(
-      "S1 — notes.pdf, p. 3",
-    );
-    expect(screen.getByLabelText("Tutor sources")).toHaveTextContent(
-      "S2 — chapter.pdf, pp. 4–6",
-    );
+    expect(screen.getByRole("link", { name: /View source S1: notes.pdf, Page 3/ }))
+      .toHaveAttribute(
+        "href",
+        "/documents/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa?chunk=11111111-1111-4111-8111-111111111111",
+      );
+    expect(screen.getByRole("link", { name: /View source S2: chapter.pdf, Pages 4–6/ }))
+      .toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith(
       "http://localhost:8000/api/v1/questions/question-1/tutor",
       expect.objectContaining({

@@ -40,6 +40,14 @@ through `AIGateway` with a strict structured-output contract, and resolves valid
 server-owned provenance. Insufficiency returns before AI generation. Citations are response-only;
 Question Generation, Attempts, Mastery, and planner evidence remain outside the flow.
 
+R6 adds a narrow citation evidence read path:
+`Document route -> DocumentService -> DocumentChunkRepository`. The repository performs an exact
+indexed lookup that binds chunk ID to Document ID and requires a READY Document with an existing
+Subject. This is not retrieval: it does not embed, rank, list chunks, or call AI. The browser uses
+the R5 Document/chunk IDs for a semantic link to a Document detail route, then obtains all displayed
+filename, page, and evidence provenance from the backend. Evidence and filenames are rendered as
+escaped text. The flow contains no writes and no Attempt, Mastery, or AIInteraction dependency.
+
 ## Backend layers
 API routes → services → repositories → database
 

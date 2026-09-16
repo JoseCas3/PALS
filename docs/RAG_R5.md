@@ -2,11 +2,12 @@
 
 ## Status and boundary
 
-**IMPLEMENTED — PENDING INDEPENDENT REVIEW**
+**CLOSED**
 
 R5 adds explicit REQUIRED grounding to the existing Question Tutor. The legacy ungrounded request
 remains the default. R5 does not add a public Retrieval endpoint, grounded Question Generation,
-citation persistence, a PDF viewer, highlighting, or other R6 citation UX.
+citation persistence, a PDF viewer, highlighting, or other R6 citation UX. R6 now consumes the
+authoritative R5 citation IDs without changing the R5 response contract.
 
 Grounded Tutor, retrieval, AI generation, citation validation, and citation display are
 evidence-neutral. None creates an Attempt or changes Mastery. Retrieval embeddings remain outside

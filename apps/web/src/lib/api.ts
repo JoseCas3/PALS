@@ -2,6 +2,7 @@ import type {
   Attempt,
   AttemptResult,
   Document,
+  DocumentEvidence,
   Exam,
   ExamTopic,
   Mastery,
@@ -83,6 +84,9 @@ export const api = {
     request<void>(`/documents/${id}`, { method: "DELETE" }),
   processDocument: (id: string) =>
     request<Document>(`/documents/${id}/process`, { method: "POST" }),
+  getDocument: (id: string) => request<Document>(`/documents/${id}`),
+  getDocumentEvidence: (documentId: string, chunkId: string) =>
+    request<DocumentEvidence>(`/documents/${documentId}/chunks/${chunkId}`),
 
   listTopics: (subjectId: string) => request<Topic[]>(`/subjects/${subjectId}/topics`),
   createTopic: (subjectId: string, value: { name: string; description?: string }) =>

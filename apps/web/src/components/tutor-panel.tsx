@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { api } from "../lib/api";
 import type { GroundedCitation } from "../lib/types";
+import { GroundedCitation as GroundedCitationCard } from "./grounded-citation";
 
 const levels = [
   { value: 1, name: "Concept", description: "One conceptual hint" },
@@ -97,19 +98,11 @@ function TutorPanelState({ questionId }: { questionId: string }) {
           <strong>Sources</strong>
           <ul>
             {citations.map((citation) => (
-              <li key={citation.alias}>
-                {citation.alias} — {citation.document_filename}, {formatPages(citation)}
-              </li>
+              <li key={citation.alias}><GroundedCitationCard citation={citation} /></li>
             ))}
           </ul>
         </div>
       )}
     </div>
   );
-}
-
-function formatPages(citation: GroundedCitation) {
-  return citation.page_start === citation.page_end
-    ? `p. ${citation.page_start}`
-    : `pp. ${citation.page_start}–${citation.page_end}`;
 }

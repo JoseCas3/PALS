@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import ApplicationError
 from app.models.document import Document, DocumentStatus
+from app.repositories.document_chunks import DocumentChunkRepository, DocumentEvidence
 from app.repositories.documents import DocumentRepository
 from app.repositories.subjects import SubjectRepository
 from app.storage.documents import DocumentStorage, DocumentStorageError, StagedDocumentDeletion
@@ -24,6 +25,7 @@ class DocumentService:
         self.session = session
         self.storage = storage
         self.documents = DocumentRepository(session)
+        self.chunks = DocumentChunkRepository(session)
         self.subjects = SubjectRepository(session)
 
     async def list_for_subject(self, subject_id: uuid.UUID) -> list[Document]:
@@ -35,6 +37,21 @@ class DocumentService:
         if document is None:
             raise ApplicationError(404, "DOCUMENT_NOT_FOUND", "Document not found")
         return document
+
+    async def get_evidence(
+        self, document_id: uuid.UUID, chunk_id: uuid.UUID
+    ) -> DocumentEvidence:
+        document = await self.get(document_id)
+        if document.status != DocumentStatus.READY.value:
+            raise ApplicationError(
+                404, "DOCUMENT_EVIDENCE_NOT_FOUND", "Document evidence not found"
+            )
+        evidence = await self.chunks.get_ready_evidence(document_id, chunk_id)
+        if evidence is None:
+            raise ApplicationError(
+                404, "DOCUMENT_EVIDENCE_NOT_FOUND", "Document evidence not found"
+            )
+        return evidence
 
     async def upload(
         self,
