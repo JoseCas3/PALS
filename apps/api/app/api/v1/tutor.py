@@ -4,18 +4,18 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.ai.gateway import AIGateway
+from app.ai.gateway import AIGatewayResolver
 from app.api.dependencies import (
     RetrievalServiceDependency,
-    get_ai_gateway,
     get_session,
+    get_tutor_ai_gateway,
 )
 from app.schemas.tutor import TutorRequest, TutorResponse
 from app.services.tutor import TutorService
 
 router = APIRouter(tags=["tutor"])
 Session = Annotated[AsyncSession, Depends(get_session)]
-Gateway = Annotated[AIGateway, Depends(get_ai_gateway)]
+GatewayResolver = Annotated[AIGatewayResolver, Depends(get_tutor_ai_gateway)]
 
 
 @router.post("/questions/{question_id}/tutor", response_model=TutorResponse)
@@ -23,7 +23,7 @@ async def tutor_question(
     question_id: uuid.UUID,
     data: TutorRequest,
     session: Session,
-    gateway: Gateway,
+    gateway: GatewayResolver,
     retrieval: RetrievalServiceDependency,
     response: Response,
 ) -> TutorResponse:

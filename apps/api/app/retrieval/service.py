@@ -36,6 +36,7 @@ class RetrievalService:
             raise ValueError("Retrieval minimum relevance must be between -1 and 1")
         self.subjects = SubjectRepository(session)
         self.chunks = DocumentChunkRepository(session)
+        self.session = session
         self.embeddings = embeddings
         self.default_limit = default_limit
         self.max_limit = max_limit
@@ -54,6 +55,7 @@ class RetrievalService:
             )
         if await self.subjects.get(subject_id) is None:
             raise ApplicationError(404, "RESOURCE_NOT_FOUND", "Subject not found")
+        await self.session.rollback()
 
         try:
             (query_vector,) = await self.embeddings.embed([prepared_query])

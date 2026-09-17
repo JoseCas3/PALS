@@ -8,6 +8,8 @@ test("navigates from a grounded Tutor citation to exact source evidence", async 
 
   await page.getByLabel("Subject name").fill("Grounded Tutor Subject");
   await page.getByRole("button", { name: "Add subject" }).click();
+  await expect(page.getByRole("button", { name: /Grounded Tutor Subject/ }).first())
+    .toHaveAttribute("aria-pressed", "true");
 
   const documents = page.getByRole("region", { name: "Documents" });
   await documents.getByLabel("Document PDF").setInputFiles({

@@ -13,7 +13,7 @@ from app.ai.contracts import (
     AIRequest,
     ProviderResponse,
 )
-from app.ai.gateway import AIGateway
+from app.ai.gateway import AIGateway, ResolvedAIGateway
 from app.ai.prompts import (
     LEVEL_INSTRUCTIONS,
     TUTOR_PROMPT_VERSION,
@@ -21,9 +21,9 @@ from app.ai.prompts import (
     TutorPromptContext,
     build_question_tutor_prompt,
 )
-from app.api.dependencies import get_ai_gateway
+from app.api.dependencies import get_tutor_ai_gateway
 from app.main import app
-from app.models import AIInteraction, Attempt, ExamTopic, Mastery, Question
+from app.models import AIInteraction, Attempt, ExamTopic, Mastery, Question, Topic
 from tests.test_exam_topics import create_topic
 from tests.test_questions import create_question
 from tests.test_subjects import create_subject
@@ -69,7 +69,9 @@ class FailingProvider(CapturingProvider):
 
 
 def override_gateway(provider: CapturingProvider) -> None:
-    app.dependency_overrides[get_ai_gateway] = lambda: AIGateway(provider, 1)
+    app.dependency_overrides[get_tutor_ai_gateway] = lambda: ResolvedAIGateway(
+        AIGateway(provider, 1)
+    )
 
 
 @pytest.mark.parametrize("level", list(TutorHelpLevel))
@@ -226,6 +228,32 @@ async def test_tutor_validation_missing_question_and_context_limits(
 
 
 @pytest.mark.asyncio
+async def test_final_user_prompt_hard_guard_remains_active(
+    async_client: AsyncClient, db_session: AsyncSession
+) -> None:
+    subject = await create_subject(async_client)
+    topic = await create_topic(async_client, subject["id"], "Large combined context")
+    question = await create_question(async_client, topic["id"])
+    topic_row = await db_session.get(Topic, uuid.UUID(str(topic["id"])))
+    question_row = await db_session.get(Question, uuid.UUID(str(question["id"])))
+    assert topic_row is not None and question_row is not None
+    topic_row.description = "d" * 4_000
+    question_row.prompt = "q" * 8_000
+    question_row.answer_reference = "a" * 8_000
+    await db_session.flush()
+    provider = CapturingProvider()
+    override_gateway(provider)
+
+    response = await async_client.post(
+        f"/api/v1/questions/{question['id']}/tutor", json={"help_level": 5}
+    )
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "TUTOR_CONTEXT_TOO_LARGE"
+    assert provider.requests == []
+
+
+@pytest.mark.asyncio
 async def test_tutor_level_five_includes_answer_reference(
     async_client: AsyncClient,
 ) -> None:
@@ -358,9 +386,12 @@ async def test_tutor_interaction_does_not_prevent_question_deletion(
 async def test_tutor_without_api_key_is_safely_unavailable(
     async_client: AsyncClient,
 ) -> None:
-    app.dependency_overrides.pop(get_ai_gateway, None)
+    app.dependency_overrides.pop(get_tutor_ai_gateway, None)
+    subject = await create_subject(async_client)
+    topic = await create_topic(async_client, subject["id"], "Unavailable")
+    question = await create_question(async_client, topic["id"])
     response = await async_client.post(
-        f"/api/v1/questions/{uuid.uuid4()}/tutor", json={"help_level": 1}
+        f"/api/v1/questions/{question['id']}/tutor", json={"help_level": 1}
     )
     assert response.status_code == 503
     assert response.json()["error"]["code"] == "AI_PROVIDER_UNAVAILABLE"

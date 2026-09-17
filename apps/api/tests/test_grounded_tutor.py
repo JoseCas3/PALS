@@ -10,16 +10,17 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.contracts import AIProviderUnavailable, AIRequest, ProviderResponse
-from app.ai.gateway import AIGateway
+from app.ai.gateway import AIGateway, ResolvedAIGateway
 from app.ai.prompts import (
     GROUNDED_TUTOR_PROMPT_VERSION,
     LEVEL_INSTRUCTIONS,
+    MAX_USER_PROMPT_CHARS,
     GroundedPromptSource,
     TutorHelpLevel,
     TutorPromptContext,
     build_grounded_question_tutor_prompt,
 )
-from app.api.dependencies import get_ai_gateway, get_retrieval_service
+from app.api.dependencies import get_retrieval_service, get_tutor_ai_gateway
 from app.embeddings.contracts import EmbeddingError
 from app.grounding.tutor import (
     CitationValidator,
@@ -94,7 +95,9 @@ class GroundedProvider:
 
 def override_grounding(retrieval: StubRetrieval, provider: GroundedProvider) -> None:
     app.dependency_overrides[get_retrieval_service] = lambda: retrieval
-    app.dependency_overrides[get_ai_gateway] = lambda: AIGateway(provider, 1)
+    app.dependency_overrides[get_tutor_ai_gateway] = lambda: ResolvedAIGateway(
+        AIGateway(provider, 1)
+    )
 
 
 async def question_fixture(client: AsyncClient) -> tuple[dict[str, object], dict[str, object]]:
@@ -143,6 +146,136 @@ async def test_insufficient_evidence_is_structured_and_skips_ai_and_evidence(
         await db_session.scalar(select(func.count()).select_from(AIInteraction)),
     )
     assert after == before
+
+
+@pytest.mark.asyncio
+async def test_grounded_tutor_selects_a_fitting_ranked_prefix_before_aliasing(
+    async_client: AsyncClient, db_session: AsyncSession
+) -> None:
+    _, question = await question_fixture(async_client)
+    chunks = [
+        retrieved_chunk(text=(f"rank-{index} evidence " * 800), filename=f"rank-{index}.pdf")
+        for index in range(1, 9)
+    ]
+    retrieval = StubRetrieval(RetrievalResult(chunks=chunks, sufficient=True))
+    provider = GroundedProvider(
+        json.dumps({"answer": "Budgeted answer", "citations": ["S1"]})
+    )
+    override_grounding(retrieval, provider)
+
+    response = await async_client.post(
+        f"/api/v1/questions/{question['id']}/tutor",
+        json={"help_level": 1, "grounding_mode": "REQUIRED"},
+    )
+
+    assert response.status_code == 200
+    assert len(provider.requests) == 1
+    prompt = provider.requests[0].user_prompt
+    assert len(prompt) <= MAX_USER_PROMPT_CHARS
+    selected = [chunk for chunk in chunks if chunk.text in prompt]
+    assert selected
+    assert selected == chunks[: len(selected)]
+    assert len(selected) < len(chunks)
+    assert f"[S{len(selected)}]" in prompt
+    assert f"[S{len(selected) + 1}]" not in prompt
+    assert response.json()["citations"][0]["chunk_id"] == str(chunks[0].chunk_id)
+    repeated = await async_client.post(
+        f"/api/v1/questions/{question['id']}/tutor",
+        json={"help_level": 1, "grounding_mode": "REQUIRED"},
+    )
+    assert repeated.status_code == 200
+    assert provider.requests[0].user_prompt == provider.requests[1].user_prompt
+    assert await db_session.scalar(select(func.count()).select_from(Attempt)) == 0
+    assert await db_session.scalar(select(func.count()).select_from(Mastery)) == 0
+
+
+@pytest.mark.asyncio
+async def test_required_insufficiency_does_not_require_generation_configuration(
+    async_client: AsyncClient, db_session: AsyncSession
+) -> None:
+    _, question = await question_fixture(async_client)
+    retrieval = StubRetrieval(RetrievalResult(chunks=[], sufficient=False))
+    app.dependency_overrides[get_retrieval_service] = lambda: retrieval
+    app.dependency_overrides.pop(get_tutor_ai_gateway, None)
+
+    response = await async_client.post(
+        f"/api/v1/questions/{question['id']}/tutor",
+        json={"help_level": 1, "grounding_mode": "REQUIRED"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["outcome"] == "INSUFFICIENT_EVIDENCE"
+    assert await db_session.scalar(select(func.count()).select_from(AIInteraction)) == 0
+    assert await db_session.scalar(select(func.count()).select_from(Attempt)) == 0
+    assert await db_session.scalar(select(func.count()).select_from(Mastery)) == 0
+
+
+@pytest.mark.asyncio
+async def test_oversized_top_ranked_source_is_explicitly_insufficient(
+    async_client: AsyncClient, db_session: AsyncSession
+) -> None:
+    _, question = await question_fixture(async_client)
+    retrieval = StubRetrieval(
+        RetrievalResult(chunks=[retrieved_chunk(text="oversized " * 3_000)], sufficient=True)
+    )
+    provider = GroundedProvider("must not run")
+    override_grounding(retrieval, provider)
+
+    response = await async_client.post(
+        f"/api/v1/questions/{question['id']}/tutor",
+        json={"help_level": 1, "grounding_mode": "REQUIRED"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["outcome"] == "INSUFFICIENT_EVIDENCE"
+    assert provider.requests == []
+    assert await db_session.scalar(select(func.count()).select_from(AIInteraction)) == 0
+    assert await db_session.scalar(select(func.count()).select_from(Attempt)) == 0
+    assert await db_session.scalar(select(func.count()).select_from(Mastery)) == 0
+
+
+@pytest.mark.asyncio
+async def test_budget_excluded_source_has_no_authorized_alias(
+    async_client: AsyncClient, db_session: AsyncSession
+) -> None:
+    _, question = await question_fixture(async_client)
+    chunks = [retrieved_chunk(text=f"rank-{index} " * 1_500) for index in range(1, 9)]
+    retrieval = StubRetrieval(RetrievalResult(chunks=chunks, sufficient=True))
+    provider = GroundedProvider(
+        json.dumps({"answer": "Unsupported source", "citations": ["S8"]})
+    )
+    override_grounding(retrieval, provider)
+
+    response = await async_client.post(
+        f"/api/v1/questions/{question['id']}/tutor",
+        json={"help_level": 1, "grounding_mode": "REQUIRED"},
+    )
+
+    assert response.status_code == 502
+    assert response.json()["error"]["code"] == "GROUNDING_INVALID_RESPONSE"
+    assert "[S8]" not in provider.requests[0].user_prompt
+    assert await db_session.scalar(select(func.count()).select_from(Attempt)) == 0
+    assert await db_session.scalar(select(func.count()).select_from(Mastery)) == 0
+
+
+@pytest.mark.asyncio
+async def test_sufficient_grounding_still_requires_generation_configuration(
+    async_client: AsyncClient,
+) -> None:
+    _, question = await question_fixture(async_client)
+    retrieval = StubRetrieval(
+        RetrievalResult(chunks=[retrieved_chunk()], sufficient=True)
+    )
+    app.dependency_overrides[get_retrieval_service] = lambda: retrieval
+    app.dependency_overrides.pop(get_tutor_ai_gateway, None)
+
+    response = await async_client.post(
+        f"/api/v1/questions/{question['id']}/tutor",
+        json={"help_level": 1, "grounding_mode": "REQUIRED"},
+    )
+
+    assert response.status_code == 503
+    assert response.json()["error"]["code"] == "AI_PROVIDER_UNAVAILABLE"
 
 
 @pytest.mark.asyncio
@@ -351,7 +484,9 @@ async def test_grounded_timeout_retains_timeout_semantics(
 
     provider = SlowProvider(json.dumps({"answer": "Late", "citations": ["S1"]}))
     app.dependency_overrides[get_retrieval_service] = lambda: retrieval
-    app.dependency_overrides[get_ai_gateway] = lambda: AIGateway(provider, 0.01)
+    app.dependency_overrides[get_tutor_ai_gateway] = lambda: ResolvedAIGateway(
+        AIGateway(provider, 0.01)
+    )
 
     response = await async_client.post(
         f"/api/v1/questions/{question['id']}/tutor",
@@ -449,7 +584,9 @@ async def test_cross_subject_source_never_reaches_grounded_prompt_or_citation(
         text="Subject B globally stronger evidence",
         embedding=vector(0),
     )
-    await db_session.flush()
+    document_a_id = document_a.id
+    document_b_id = document_b.id
+    await db_session.commit()
     actual_retrieval = retrieval_service(
         db_session, QueryProvider(vector(0)), threshold=-1.0
     )
@@ -457,7 +594,9 @@ async def test_cross_subject_source_never_reaches_grounded_prompt_or_citation(
         json.dumps({"answer": "Subject-scoped answer", "citations": ["S1"]})
     )
     app.dependency_overrides[get_retrieval_service] = lambda: actual_retrieval
-    app.dependency_overrides[get_ai_gateway] = lambda: AIGateway(provider, 1)
+    app.dependency_overrides[get_tutor_ai_gateway] = lambda: ResolvedAIGateway(
+        AIGateway(provider, 1)
+    )
 
     response = await async_client.post(
         f"/api/v1/questions/{question['id']}/tutor",
@@ -466,7 +605,7 @@ async def test_cross_subject_source_never_reaches_grounded_prompt_or_citation(
 
     assert response.status_code == 200
     citation = response.json()["citations"][0]
-    assert citation["document_id"] == str(document_a.id)
-    assert citation["document_id"] != str(document_b.id)
+    assert citation["document_id"] == str(document_a_id)
+    assert citation["document_id"] != str(document_b_id)
     assert "Subject A evidence only" in provider.requests[0].user_prompt
     assert "Subject B globally stronger evidence" not in provider.requests[0].user_prompt

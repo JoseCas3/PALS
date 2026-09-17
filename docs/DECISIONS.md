@@ -164,3 +164,17 @@ Crash-orphaned upload files, crash-stuck PROCESSING rows, and post-commit staged
 bounded accepted limitations until measured operations justify reconciliation tooling, workers, or
 watchdogs. Exact pgvector scan, internal retrieval, transient aliases, and exact evidence lookup
 remain intentional local-first boundaries.
+
+## ADR-027 Bounded RAG stabilization ownership
+
+Accepted. Grounded Tutor owns deterministic context budgeting after retrieval and before final
+server alias assignment. It selects the longest ranked prefix whose exact assembled user prompt is
+within the existing 20,000-character guard. Evidence is never truncated. If the highest-ranked
+source cannot fit, REQUIRED grounding returns structured insufficiency without generation. The
+existing final prompt guard remains defense-in-depth.
+
+`RetrievalService` owns its read/provider/query sequence and ends the read-only prerequisite
+transaction before query embedding. Repositories retain no hidden commit ownership. Tutor's
+generative gateway is resolved lazily only after REQUIRED evidence is sufficient and budget-fit;
+NONE and sufficient REQUIRED paths still require the configured provider. Retrieval policy,
+schema, evidence authority, and the accepted local-first architecture are unchanged.

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -9,7 +10,7 @@ from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.contracts import AIProviderException, AIRequest, AIResponse, AIStructuredResponse
-from app.ai.gateway import AIGateway
+from app.ai.gateway import AIGatewayResolver
 from app.ai.prompts import (
     GROUNDED_TUTOR_PROMPT_VERSION,
     MAX_ANSWER_REFERENCE_CHARS,
@@ -38,6 +39,7 @@ from app.grounding.tutor import (
 from app.models.ai_interaction import AIInteraction
 from app.repositories.ai_interactions import AIInteractionRepository
 from app.repositories.tutor import QuestionTutorContext, TutorRepository
+from app.retrieval.contracts import RetrievedChunk
 from app.retrieval.service import RetrievalService
 from app.schemas.tutor import (
     GroundedTutorGeneration,
@@ -95,7 +97,7 @@ class TutorService:
     def __init__(
         self,
         session: AsyncSession,
-        gateway: AIGateway,
+        gateway: AIGatewayResolver,
         retrieval: RetrievalService | None = None,
     ) -> None:
         self.session = session
@@ -153,21 +155,13 @@ class TutorService:
                     502, exc.code, "Embedding generation failed"
                 ) from exc
             if not retrieval.sufficient:
-                return TutorResult(
-                    interaction_id=None,
-                    question_id=context.question_id,
-                    help_level=int(help_level),
-                    grounding_mode=grounding_mode,
-                    outcome=TutorOutcome.INSUFFICIENT_EVIDENCE,
-                    content=None,
-                    answer=None,
-                    citations=(),
-                    provider=None,
-                    model=None,
-                    prompt_version=GROUNDED_TUTOR_PROMPT_VERSION,
-                    created_at=None,
-                )
-            grounded_context = build_grounded_context(retrieval.chunks)
+                return self._insufficient_result(context, help_level, grounding_mode)
+            selected_chunks = self._select_grounded_chunks(
+                prompt_context, retrieval.chunks
+            )
+            if not selected_chunks:
+                return self._insufficient_result(context, help_level, grounding_mode)
+            grounded_context = build_grounded_context(selected_chunks)
             prompt = build_grounded_question_tutor_prompt(
                 prompt_context,
                 tuple(
@@ -190,9 +184,10 @@ class TutorService:
                 "Question context is too large for Tutor assistance",
             )
 
+        gateway = await self.gateway.resolve()
         interaction = await self.interactions.create_pending(
-            provider=self.gateway.provider.provider_name,
-            model=self.gateway.provider.model_name,
+            provider=gateway.provider.provider_name,
+            model=gateway.provider.model_name,
             operation="question_tutor",
             subject_id=context.subject_id,
             topic_id=context.topic_id,
@@ -220,7 +215,7 @@ class TutorService:
             ),
         )
         try:
-            response = await self.gateway.generate(request)
+            response = await gateway.generate(request)
         except AIProviderException as exc:
             latency_ms = exc.latency_ms if exc.latency_ms is not None else 0
             self.interactions.finalize_failure(
@@ -282,6 +277,52 @@ class TutorService:
             model=response.model,
             prompt_version=prompt.version,
             created_at=interaction.created_at,
+        )
+
+    @staticmethod
+    def _select_grounded_chunks(
+        context: TutorPromptContext, chunks: Sequence[RetrievedChunk]
+    ) -> tuple[RetrievedChunk, ...]:
+        selected: list[RetrievedChunk] = []
+        for chunk in chunks:
+            candidates = (*selected, chunk)
+            prompt = build_grounded_question_tutor_prompt(
+                context,
+                tuple(
+                    GroundedPromptSource(
+                        alias=f"S{index}",
+                        document_filename=candidate.document_filename,
+                        page_start=candidate.page_start,
+                        page_end=candidate.page_end,
+                        text=candidate.text,
+                    )
+                    for index, candidate in enumerate(candidates, start=1)
+                ),
+            )
+            if len(prompt.user_prompt) > MAX_USER_PROMPT_CHARS:
+                break
+            selected.append(chunk)
+        return tuple(selected)
+
+    @staticmethod
+    def _insufficient_result(
+        context: QuestionTutorContext,
+        help_level: TutorHelpLevel,
+        grounding_mode: GroundingMode,
+    ) -> TutorResult:
+        return TutorResult(
+            interaction_id=None,
+            question_id=context.question_id,
+            help_level=int(help_level),
+            grounding_mode=grounding_mode,
+            outcome=TutorOutcome.INSUFFICIENT_EVIDENCE,
+            content=None,
+            answer=None,
+            citations=(),
+            provider=None,
+            model=None,
+            prompt_version=GROUNDED_TUTOR_PROMPT_VERSION,
+            created_at=None,
         )
 
     async def _finalize_invalid_grounding(

@@ -99,7 +99,11 @@ Unstructured are outside the frozen architecture.
 3. R4: Subject-scoped retrieval with deterministic filtering and thresholds (closed).
 4. R5: grounded Tutor context and source citations without changing evidence authority (closed).
 5. R6: citation navigation and Document evidence UX (closed).
-6. R7: end-to-end RAG hardening (implemented; pending independent review).
+6. R7: end-to-end RAG hardening (closed after independent review).
+
+The RAG milestone architecture review concluded `RAG_MILESTONE=READY_WITH_FOLLOW_UPS`. Stabilization
+S1 implements only the bounded prompt-budget, transaction-lifetime, lazy-generation-composition,
+and closure-documentation follow-ups; it is implemented pending independent review.
 
 Each sprint must preserve local-first operation, provider isolation, metadata-only AIInteraction,
 and the rule that only successful Attempt creation changes Mastery.

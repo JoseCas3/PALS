@@ -121,6 +121,9 @@ the flow remains evidence-neutral and exposes no vectors or storage paths. See `
 `docs/RAG_R6.md`.
 R7 hardens concurrency and process/delete recovery without adding product scope, and records the
 integrated lifecycle, crash windows, and pre-Beta debt in `docs/RAG_R7.md`.
+R6 and R7 are independently reviewed and closed. The milestone architecture review concluded
+`RAG_MILESTONE=READY_WITH_FOLLOW_UPS`; bounded Stabilization S1 follow-ups are documented in
+`docs/RAG_STABILIZATION_S1.md` and remain pending independent review.
 
 ## Sprint 1 domain core
 
@@ -231,7 +234,8 @@ npm run test:e2e
 R1 adds Subject-owned PDF Documents with PostgreSQL metadata and opaque-key local filesystem
 storage. R2 adds explicit deterministic PDF extraction and page-aware chunking. R3 adds a separate
 embedding boundary, pgvector 0.8.6, persistent `DocumentChunk` rows, atomic retrieval-ready
-publication, the closed R4 Retrieval Service, the closed R5 Grounded Tutor, and the R6 citation and
-Document UX implementation pending independent review. See `docs/RAG_R1.md`, `docs/RAG_R2.md`,
-`docs/RAG_R3.md`, `docs/RAG_R4.md`, `docs/RAG_R5.md`, `docs/RAG_R6.md`, and
-`docs/RAG_ARCHITECTURE.md`.
+publication, the closed R4 Retrieval Service, closed R5 Grounded Tutor, closed R6 citation and
+Document UX, and closed R7 integration hardening. The milestone architecture is accepted with the
+bounded S1 follow-ups implemented pending independent review. See `docs/RAG_R1.md`,
+`docs/RAG_R2.md`, `docs/RAG_R3.md`, `docs/RAG_R4.md`, `docs/RAG_R5.md`, `docs/RAG_R6.md`,
+`docs/RAG_R7.md`, `docs/RAG_STABILIZATION_S1.md`, and `docs/RAG_ARCHITECTURE.md`.

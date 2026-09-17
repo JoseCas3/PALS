@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.adapters.fake import FakeAIProvider
 from app.ai.adapters.openai import OpenAIProvider
-from app.ai.gateway import AIGateway
+from app.ai.gateway import AIGateway, AIGatewayResolver
 from app.core.config import get_settings
 from app.core.errors import ApplicationError
 from app.db.session import async_session_factory
@@ -32,33 +32,60 @@ Session = Annotated[AsyncSession, Depends(get_session)]
 
 
 async def get_ai_gateway() -> AsyncIterator[AIGateway]:
-    settings = get_settings()
-    if settings.ai_provider == "fake":
-        yield AIGateway(
-            FakeAIProvider(model_name=settings.ai_model),
+    resolver = ConfiguredAIGatewayResolver()
+    try:
+        yield await resolver.resolve()
+    finally:
+        await resolver.aclose()
+
+
+class ConfiguredAIGatewayResolver:
+    def __init__(self) -> None:
+        self.gateway: AIGateway | None = None
+        self.provider: OpenAIProvider | None = None
+
+    async def resolve(self) -> AIGateway:
+        if self.gateway is not None:
+            return self.gateway
+        settings = get_settings()
+        if settings.ai_provider == "fake":
+            self.gateway = AIGateway(
+                FakeAIProvider(model_name=settings.ai_model),
+                timeout_seconds=settings.ai_timeout_seconds,
+            )
+            return self.gateway
+        api_key = (
+            settings.ai_api_key.get_secret_value().strip()
+            if settings.ai_api_key is not None
+            else ""
+        )
+        if settings.ai_provider != "openai" or not api_key:
+            raise ApplicationError(
+                503,
+                "AI_PROVIDER_UNAVAILABLE",
+                "AI service is temporarily unavailable",
+            )
+        self.provider = OpenAIProvider.create(
+            api_key=api_key,
+            model=settings.ai_model,
             timeout_seconds=settings.ai_timeout_seconds,
         )
-        return
-    api_key = (
-        settings.ai_api_key.get_secret_value().strip()
-        if settings.ai_api_key is not None
-        else ""
-    )
-    if settings.ai_provider != "openai" or not api_key:
-        raise ApplicationError(
-            503,
-            "AI_PROVIDER_UNAVAILABLE",
-            "AI service is temporarily unavailable",
+        self.gateway = AIGateway(
+            self.provider, timeout_seconds=settings.ai_timeout_seconds
         )
-    provider = OpenAIProvider.create(
-        api_key=api_key,
-        model=settings.ai_model,
-        timeout_seconds=settings.ai_timeout_seconds,
-    )
+        return self.gateway
+
+    async def aclose(self) -> None:
+        if self.provider is not None:
+            await self.provider.aclose()
+
+
+async def get_tutor_ai_gateway() -> AsyncIterator[AIGatewayResolver]:
+    resolver = ConfiguredAIGatewayResolver()
     try:
-        yield AIGateway(provider, timeout_seconds=settings.ai_timeout_seconds)
+        yield resolver
     finally:
-        await provider.aclose()
+        await resolver.aclose()
 
 
 def get_document_storage() -> DocumentStorage:

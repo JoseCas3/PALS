@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from time import perf_counter
+from typing import Protocol
 
 from app.ai.contracts import (
     AIProvider,
@@ -61,3 +62,15 @@ class AIGateway:
             provider_request_id=response.provider_request_id,
             latency_ms=latency_ms,
         )
+
+
+class AIGatewayResolver(Protocol):
+    async def resolve(self) -> AIGateway: ...
+
+
+class ResolvedAIGateway:
+    def __init__(self, gateway: AIGateway) -> None:
+        self.gateway = gateway
+
+    async def resolve(self) -> AIGateway:
+        return self.gateway

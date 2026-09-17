@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import uuid
 from collections.abc import Sequence
 
@@ -142,6 +143,39 @@ async def test_empty_compatible_corpus_is_normal_and_query_is_prepared(
 
 
 @pytest.mark.asyncio
+async def test_query_embedding_wait_holds_no_prerequisite_database_transaction(
+    async_client: AsyncClient, db_session: AsyncSession
+) -> None:
+    subject = await create_subject(async_client)
+
+    class GatedQueryProvider(QueryProvider):
+        def __init__(self) -> None:
+            super().__init__()
+            self.started = asyncio.Event()
+            self.release = asyncio.Event()
+
+        async def embed(self, texts: Sequence[str]) -> Sequence[ProviderEmbedding]:
+            self.started.set()
+            await self.release.wait()
+            return await super().embed(texts)
+
+    provider = GatedQueryProvider()
+    retrieval = asyncio.create_task(
+        retrieval_service(db_session, provider).retrieve(
+            uuid.UUID(str(subject["id"])), "transaction boundary"
+        )
+    )
+    try:
+        await asyncio.wait_for(provider.started.wait(), timeout=5)
+        assert not db_session.in_transaction()
+    finally:
+        provider.release.set()
+
+    result = await asyncio.wait_for(retrieval, timeout=5)
+    assert result.chunks == [] and result.sufficient is False
+
+
+@pytest.mark.asyncio
 async def test_query_embedding_failure_is_sanitized(
     async_client: AsyncClient, db_session: AsyncSession
 ) -> None:
@@ -194,7 +228,8 @@ async def test_subject_ready_profile_filters_and_exact_cosine_ordering(
         text="global best excluded",
         embedding=vector(0, 1.0),
     )
-    await db_session.flush()
+    eligible_one_id = eligible_one.id
+    await db_session.commit()
 
     result = await retrieval_service(db_session, threshold=-1.0).retrieve(
         uuid.UUID(str(subject_a["id"])), "query"
@@ -202,7 +237,7 @@ async def test_subject_ready_profile_filters_and_exact_cosine_ordering(
 
     assert [chunk.text for chunk in result.chunks] == ["best", "second"]
     assert result.sufficient is True
-    assert result.chunks[0].document_id == eligible_one.id
+    assert result.chunks[0].document_id == eligible_one_id
     assert result.chunks[0].document_filename == "one.pdf"
     assert (result.chunks[0].page_start, result.chunks[0].page_end) == (2, 3)
     assert result.chunks[0].relevance_score == pytest.approx(1.0)
@@ -275,11 +310,14 @@ async def test_threshold_boundary_limit_deduplication_and_stable_ties(
     second = add_chunk(db_session, document, index=2, text="stable second", embedding=vector())
     add_chunk(db_session, document, index=3, text="below", embedding=vector(0, -1.0))
     await db_session.flush()
+    first_id = first.id
+    second_id = second.id
+    await db_session.commit()
 
     result = await retrieval_service(db_session, threshold=1.0, default_limit=2).retrieve(
         uuid.UUID(str(subject["id"])), "query", limit=2
     )
-    assert [chunk.chunk_id for chunk in result.chunks] == [first.id, second.id]
+    assert [chunk.chunk_id for chunk in result.chunks] == [first_id, second_id]
     assert all(chunk.relevance_score == pytest.approx(1.0) for chunk in result.chunks)
 
     filtered = await retrieval_service(db_session, threshold=0.0).retrieve(
@@ -301,7 +339,7 @@ async def test_all_candidates_below_threshold_is_insufficient_and_evidence_neutr
         async_client, db_session, subject["id"], filename="low.pdf", content=OTHER_PDF
     )
     add_chunk(db_session, document, index=0, text="low", embedding=vector(0, -1.0))
-    await db_session.flush()
+    await db_session.commit()
     before = (
         await db_session.scalar(select(func.count()).select_from(Attempt)),
         await db_session.scalar(select(func.count()).select_from(Mastery)),

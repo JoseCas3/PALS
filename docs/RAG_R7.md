@@ -2,7 +2,11 @@
 
 ## Status and scope
 
-**IMPLEMENTED — PENDING INDEPENDENT REVIEW**
+**CLOSED — INDEPENDENTLY REVIEWED**
+
+The later RAG milestone architecture review accepted the architecture with bounded follow-ups.
+Those follow-ups are recorded separately in `RAG_STABILIZATION_S1.md`; this historical R7 hardening
+record remains otherwise unchanged.
 
 R7 audits and hardens the integrated R1–R6 retrieval-augmented Tutor flow. It adds no product
 feature, endpoint, table, migration, provider, framework, worker, queue, authentication boundary,

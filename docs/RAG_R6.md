@@ -2,7 +2,7 @@
 
 ## Status and boundary
 
-**IMPLEMENTED — PENDING INDEPENDENT REVIEW**
+**CLOSED — INDEPENDENTLY REVIEWED**
 
 R6 turns R5 response-level citation provenance into navigable study evidence. It adds an exact
 Document/chunk evidence endpoint, interactive Tutor citation cards, and a Document detail route.
