@@ -151,3 +151,16 @@ dependencies are exactly pinned, but a transitive backend lock is deferred befor
 adding a new resolver workflow is beyond this focused remediation. ExamTopic request transport
 continues to cross a float boundary; a decimal-safe public transport is deferred API debt, while
 planner calculations over persisted values remain exact and deterministic.
+
+## ADR-026 RAG integration recovery boundaries
+
+Accepted. A conditional PostgreSQL update is the synchronous processing mutex; extraction and
+embedding run outside transactions; complete chunks and READY profile metadata publish atomically.
+If deletion wins an in-flight processing race, failure cleanup tolerates only the now-absent row and
+cannot recreate it. Unexpected extant lifecycle states still fail and roll back. Attempt creation
+remains the exclusive Mastery authority.
+
+Crash-orphaned upload files, crash-stuck PROCESSING rows, and post-commit staged deletion orphans are
+bounded accepted limitations until measured operations justify reconciliation tooling, workers, or
+watchdogs. Exact pgvector scan, internal retrieval, transient aliases, and exact evidence lookup
+remain intentional local-first boundaries.

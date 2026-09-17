@@ -119,6 +119,8 @@ transient server-issued source aliases, validated response-level provenance, and
 R6 adds interactive citations, exact READY source-evidence inspection, and a Document detail route;
 the flow remains evidence-neutral and exposes no vectors or storage paths. See `docs/RAG_R5.md` and
 `docs/RAG_R6.md`.
+R7 hardens concurrency and process/delete recovery without adding product scope, and records the
+integrated lifecycle, crash windows, and pre-Beta debt in `docs/RAG_R7.md`.
 
 ## Sprint 1 domain core
 

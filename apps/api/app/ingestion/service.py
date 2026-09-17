@@ -159,9 +159,18 @@ class IngestionService:
     async def _fail(self, document_id: uuid.UUID, error_code: str) -> None:
         await self.session.rollback()
         await self.document_chunks.delete_for_document(document_id)
-        await self.documents.finish_processing(
+        document = await self.documents.finish_processing(
             document_id, status=DocumentStatus.FAILED.value, error_code=error_code
         )
+        if document is None:
+            current = await self.documents.get(document_id)
+            if current is not None:
+                await self.session.rollback()
+                raise RuntimeError("Document failure cleanup found a non-processing row")
+            logger.info(
+                "Document failure cleanup found no processing row document_id=%s",
+                document_id,
+            )
         await self.session.commit()
 
     async def _raise_claim_error(self, document_id: uuid.UUID) -> NoReturn:

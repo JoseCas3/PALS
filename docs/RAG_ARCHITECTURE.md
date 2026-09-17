@@ -98,8 +98,11 @@ Unstructured are outside the frozen architecture.
 2. R3: persisted chunks, embeddings, pgvector, and atomic retrieval-ready publication.
 3. R4: Subject-scoped retrieval with deterministic filtering and thresholds (closed).
 4. R5: grounded Tutor context and source citations without changing evidence authority (closed).
-5. R6: citation navigation and Document evidence UX (implemented; pending independent review).
-6. R7: end-to-end RAG hardening.
+5. R6: citation navigation and Document evidence UX (closed).
+6. R7: end-to-end RAG hardening (implemented; pending independent review).
 
 Each sprint must preserve local-first operation, provider isolation, metadata-only AIInteraction,
 and the rule that only successful Attempt creation changes Mastery.
+
+R7's lifecycle, recovery, crash-window, privacy, dependency-debt, and integrated validation record
+is documented in `RAG_R7.md`.

@@ -94,14 +94,14 @@ class DocumentRepository:
 
     async def finish_processing(
         self, document_id: uuid.UUID, *, status: str, error_code: str | None
-    ) -> Document:
+    ) -> Document | None:
         result = await self.session.scalars(
             update(Document)
             .where(Document.id == document_id, Document.status == "PROCESSING")
             .values(status=status, error_code=error_code)
             .returning(Document)
         )
-        document = result.one()
+        document = result.one_or_none()
         return document
 
     async def delete(self, document: Document) -> None:
